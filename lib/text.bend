@@ -369,21 +369,61 @@ def prop(k: String, v: String) -> String:
 def entity(key: String, name: String, image: String, ty: String, emoji: String, ps: List<&2, String>, rel: String) -> String:
   "{\"key\":" ++ jstr(key) ++ ",\"name\":" ++ jstr(name) ++ ",\"image\":" ++ jstr(image) ++ ",\"type\":" ++ jstr(ty) ++ ",\"emoji\":" ++ jstr(emoji) ++ ",\"properties\":{" ++ String.join(ps, ",") ++ "}" ++ rel ++ "}"
 
-def org_kind_name(k: A.OrgKind) -> String:
+# ---- each object's type, named by its most specific kind ----
+def org_type(k: A.OrgKind) -> String:
   match k:
     case A.Business{}:
-      "business"
+      "Business"
     case A.Nonprofit{}:
-      "nonprofit"
+      "Nonprofit"
     case A.Community{}:
-      "community"
+      "Community"
+
+def system_type(k: A.SystemKind) -> String:
+  match k:
+    case A.Product{}:
+      "Product"
+    case A.Project{}:
+      "Project"
+    case A.Framework{}:
+      "Framework"
+    case A.Library{}:
+      "Library"
+
+def role_type(r: A.NodeRole) -> String:
+  match r:
+    case A.UserDevice{}:
+      "User's device"
+    case A.Server{}:
+      "Server"
+    case A.Overlay{}:
+      "Private network"
+    case A.Outside{}:
+      "Outside"
+
+def program_type(k: A.ContainerKind) -> String:
+  match k:
+    case A.Client{}:
+      "Client"
+    case A.DataApi{}:
+      "Data API"
+    case A.Harness{}:
+      "Harness"
+    case A.Proxy{}:
+      "Proxy"
+    case A.ModelApi{}:
+      "Model API"
+    case A.Cli{}:
+      "CLI"
+    case A.Worker{}:
+      "Worker"
 
 def owner_json(+o: A.Owner) -> String:
   match o:
     case A.Individual{+name, image}:
       entity(name, name, image, "Individual", A.owner_emoji(o), [], "")
     case A.Organization{+name, image, +k}:
-      entity(name, name, image, "Organization", A.owner_emoji(o), [prop("kind", org_kind_name(k))], "")
+      entity(name, name, image, org_type(k), A.owner_emoji(o), [], "")
 
 def owners_json(os: List<&2, A.Owner>) -> List<&2, String>:
   match os:
@@ -392,17 +432,6 @@ def owners_json(os: List<&2, A.Owner>) -> List<&2, String>:
     case o <> rest:
       owner_json(o) <> owners_json(rest)
 
-def system_kind_name(k: A.SystemKind) -> String:
-  match k:
-    case A.Product{}:
-      "product"
-    case A.Project{}:
-      "project"
-    case A.Framework{}:
-      "framework"
-    case A.Library{}:
-      "library"
-
 def nodes_json(ns: List<&2, A.Node>) -> List<&2, String>:
   match ns:
     case []:
@@ -410,7 +439,7 @@ def nodes_json(ns: List<&2, A.Node>) -> List<&2, String>:
     case n <> rest:
       match n:
         case A.Node{+k, name, +role, host}:
-          entity(k, name, "", "Machine", A.role_emoji(role), [prop("key", k), prop("role", role_name(role)), prop("host", host_name(host))], ",\"role\":" ++ jstr(role_name(role))) <> nodes_json(rest)
+          entity(k, name, "", role_type(role), A.role_emoji(role), [prop("key", k), prop("host", host_name(host))], ",\"role\":" ++ jstr(role_name(role))) <> nodes_json(rest)
 
 def containers_json(cs: List<&2, A.Container>) -> List<&2, String>:
   match cs:
@@ -419,7 +448,7 @@ def containers_json(cs: List<&2, A.Container>) -> List<&2, String>:
     case c <> rest:
       match c:
         case A.Container{+k, name, +kind, owner, +on, _, _, _, +vendors, +frameworks, libraries, languages}:
-          entity(k, name, "", "Program", A.container_emoji(kind), [prop("key", k), prop("kind", kind_name(kind)), prop("owner", owner_name(owner)), prop("vendors", String.join(vendors, ", ")), prop("frameworks", String.join(frameworks, ", ")), prop("libraries", String.join(libraries, ", ")), prop("languages", String.join(languages, ", "))], ",\"node\":" ++ jstr(on) ++ ",\"brands\":" ++ jlist(jstrs(List.append(&2, String, vendors, frameworks)))) <> containers_json(rest)
+          entity(k, name, "", program_type(kind), A.container_emoji(kind), [prop("key", k), prop("owner", owner_name(owner)), prop("vendors", String.join(vendors, ", ")), prop("frameworks", String.join(frameworks, ", ")), prop("libraries", String.join(libraries, ", ")), prop("languages", String.join(languages, ", "))], ",\"node\":" ++ jstr(on) ++ ",\"brands\":" ++ jlist(jstrs(List.append(&2, String, vendors, frameworks)))) <> containers_json(rest)
 
 def parts_json(ps: List<&2, A.Part>) -> List<&2, String>:
   match ps:
@@ -428,7 +457,7 @@ def parts_json(ps: List<&2, A.Part>) -> List<&2, String>:
     case p <> rest:
       match p:
         case A.Part{+k, name, +lang, +i, +on}:
-          entity(k, name, "", "Part", A.lang_emoji(lang), [prop("key", k), prop("language", lang_name(lang)), prop("program", i), prop("machine", on)], ",\"program\":" ++ jstr(i) ++ ",\"node\":" ++ jstr(on)) <> parts_json(rest)
+          entity(k, name, "", lang_name(lang) ++ " part", A.lang_emoji(lang), [prop("key", k), prop("program", i), prop("machine", on)], ",\"program\":" ++ jstr(i) ++ ",\"node\":" ++ jstr(on)) <> parts_json(rest)
 
 def links_json(ls: List<&2, A.Link>) -> List<&2, String>:
   match ls:
@@ -442,7 +471,7 @@ def links_json(ls: List<&2, A.Link>) -> List<&2, String>:
 # The graph as JSON: the system and its owner, tenants, machines, programs, parts and links, from its
 # one start (the proof rules out a system with several).
 def json(+s: A.System, +name: String, +image: String, +owner: A.Owner, +kind: A.SystemKind, ts: List<&2, A.Owner>, ok: {one_start(s) == True{} : Bool}) -> String:
-  "{\"system\":" ++ entity(name, name, image, "System", A.kind_emoji(kind), [prop("kind", system_kind_name(kind))], "") ++
+  "{\"system\":" ++ entity(name, name, image, system_type(kind), A.kind_emoji(kind), [], "") ++
   ",\"owner\":" ++ owner_json(owner) ++ ",\"tenants\":" ++ jlist(owners_json(ts)) ++
   ",\"start\":" ++ jstr(head_or(starts(programs(s), program_links(A.links(s), s)), "")) ++
   ",\"machines\":" ++ jlist(nodes_json(A.nodes(s))) ++ ",\"programs\":" ++ jlist(containers_json(A.containers(s))) ++

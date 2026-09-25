@@ -1,5 +1,5 @@
 import Base
-import near-architecture@0.9.1.0/arc.bend as A
+import ../arc/arc.bend as A
 
 # A system as a graph with one start, and its Markdown serialization.
 # The graph: every container and part, joined by the links and by containment (a container holds its
@@ -367,8 +367,8 @@ def nodes_json(ns: List<&2, A.Node>) -> List<&2, String>:
       []
     case n <> rest:
       match n:
-        case A.Node{k, name, role, host}:
-          ("{\"key\":" ++ jstr(k) ++ ",\"name\":" ++ jstr(name) ++ ",\"role\":" ++ jstr(role_name(role)) ++ ",\"host\":" ++ jstr(host_name(host)) ++ "}") <> nodes_json(rest)
+        case A.Node{k, name, +role, host}:
+          ("{\"key\":" ++ jstr(k) ++ ",\"name\":" ++ jstr(name) ++ ",\"role\":" ++ jstr(role_name(role)) ++ ",\"host\":" ++ jstr(host_name(host)) ++ ",\"emoji\":" ++ jstr(A.role_emoji(role)) ++ "}") <> nodes_json(rest)
 
 def containers_json(cs: List<&2, A.Container>) -> List<&2, String>:
   match cs:
@@ -376,8 +376,8 @@ def containers_json(cs: List<&2, A.Container>) -> List<&2, String>:
       []
     case c <> rest:
       match c:
-        case A.Container{k, name, kind, owner, on, _, _, _, vendors, frameworks, libraries, languages}:
-          ("{\"key\":" ++ jstr(k) ++ ",\"name\":" ++ jstr(name) ++ ",\"kind\":" ++ jstr(kind_name(kind)) ++ ",\"owner\":" ++ jstr(owner_name(owner)) ++ ",\"node\":" ++ jstr(on) ++ ",\"vendors\":" ++ jlist(jstrs(vendors)) ++ ",\"frameworks\":" ++ jlist(jstrs(frameworks)) ++ ",\"libraries\":" ++ jlist(jstrs(libraries)) ++ ",\"languages\":" ++ jlist(jstrs(languages)) ++ "}") <> containers_json(rest)
+        case A.Container{k, name, +kind, owner, on, _, _, _, vendors, frameworks, libraries, languages}:
+          ("{\"key\":" ++ jstr(k) ++ ",\"name\":" ++ jstr(name) ++ ",\"emoji\":" ++ jstr(A.container_emoji(kind)) ++ ",\"kind\":" ++ jstr(kind_name(kind)) ++ ",\"owner\":" ++ jstr(owner_name(owner)) ++ ",\"node\":" ++ jstr(on) ++ ",\"vendors\":" ++ jlist(jstrs(vendors)) ++ ",\"frameworks\":" ++ jlist(jstrs(frameworks)) ++ ",\"libraries\":" ++ jlist(jstrs(libraries)) ++ ",\"languages\":" ++ jlist(jstrs(languages)) ++ "}") <> containers_json(rest)
 
 def parts_json(ps: List<&2, A.Part>) -> List<&2, String>:
   match ps:
@@ -385,8 +385,8 @@ def parts_json(ps: List<&2, A.Part>) -> List<&2, String>:
       []
     case p <> rest:
       match p:
-        case A.Part{k, name, lang, i, on}:
-          ("{\"key\":" ++ jstr(k) ++ ",\"name\":" ++ jstr(name) ++ ",\"lang\":" ++ jstr(lang_name(lang)) ++ ",\"container\":" ++ jstr(i) ++ ",\"node\":" ++ jstr(on) ++ "}") <> parts_json(rest)
+        case A.Part{k, name, +lang, i, on}:
+          ("{\"key\":" ++ jstr(k) ++ ",\"name\":" ++ jstr(name) ++ ",\"emoji\":" ++ jstr(A.lang_emoji(lang)) ++ ",\"lang\":" ++ jstr(lang_name(lang)) ++ ",\"container\":" ++ jstr(i) ++ ",\"node\":" ++ jstr(on) ++ "}") <> parts_json(rest)
 
 def links_json(ls: List<&2, A.Link>) -> List<&2, String>:
   match ls:
@@ -397,6 +397,33 @@ def links_json(ls: List<&2, A.Link>) -> List<&2, String>:
         case A.Link{a, b, label, _}:
           ("{\"src\":" ++ jstr(a) ++ ",\"dst\":" ++ jstr(b) ++ ",\"label\":" ++ jstr(label) ++ "}") <> links_json(rest)
 
+def system_kind_name(k: A.SystemKind) -> String:
+  match k:
+    case A.Product{}:
+      "product"
+    case A.Project{}:
+      "project"
+    case A.Framework{}:
+      "framework"
+    case A.Library{}:
+      "library"
+
+def tenant_kind_name(k: A.TenantKind) -> String:
+  match k:
+    case A.Individual{}:
+      "individual"
+    case A.Company{}:
+      "company"
+
+def tenants_json(ts: List<&2, A.Tenant>) -> List<&2, String>:
+  match ts:
+    case []:
+      []
+    case t <> rest:
+      match t:
+        case A.Tenant{k, name, +kind}:
+          ("{\"key\":" ++ jstr(k) ++ ",\"name\":" ++ jstr(name) ++ ",\"kind\":" ++ jstr(tenant_kind_name(kind)) ++ ",\"emoji\":" ++ jstr(A.tenant_emoji(kind)) ++ "}") <> tenants_json(rest)
+
 # The graph as JSON, from its one start (the proof again rules out a system with several).
-def json(+s: A.System, ok: {one_start(s) == True{} : Bool}) -> String:
-  "{\"start\":" ++ jstr(head_or(starts(programs(s), program_links(A.links(s), s)), "")) ++ ",\"nodes\":" ++ jlist(nodes_json(A.nodes(s))) ++ ",\"containers\":" ++ jlist(containers_json(A.containers(s))) ++ ",\"parts\":" ++ jlist(parts_json(A.parts(s))) ++ ",\"links\":" ++ jlist(links_json(A.links(s))) ++ "}"
+def json(+s: A.System, +kind: A.SystemKind, ts: List<&2, A.Tenant>, ok: {one_start(s) == True{} : Bool}) -> String:
+  "{\"kind\":" ++ jstr(system_kind_name(kind)) ++ ",\"emoji\":" ++ jstr(A.kind_emoji(kind)) ++ ",\"tenants\":" ++ jlist(tenants_json(ts)) ++ ",\"start\":" ++ jstr(head_or(starts(programs(s), program_links(A.links(s), s)), "")) ++ ",\"nodes\":" ++ jlist(nodes_json(A.nodes(s))) ++ ",\"containers\":" ++ jlist(containers_json(A.containers(s))) ++ ",\"parts\":" ++ jlist(parts_json(A.parts(s))) ++ ",\"links\":" ++ jlist(links_json(A.links(s))) ++ "}"

@@ -1,5 +1,5 @@
 import Base
-import near-architecture@0.9.1.0/arc.bend as A
+import ../arc/arc.bend as A
 import ../lib/deploy.bend as D
 
 # V's architecture, written with Arc. V deploys by publishing its packages to the Bend hub
@@ -54,3 +54,10 @@ def targets() -> List<&2, D.Target>:
 def packages() -> List<&2, D.Package>:
   [ D.Package{"near-architecture", "0.9.1.0", "../arc/arc.bend", ["arc"]},
     D.Package{"near-v-framework", "0.2.0.0", "../v.bend", ["cli", "lib", "proc"]} ]
+
+# ---- what V is, and who it serves ----
+def kind() -> A.SystemKind:
+  A.Framework{}
+
+def tenants() -> List<&2, A.Tenant>:
+  [A.Tenant{"pedro", "Pedro", A.Individual{}}]

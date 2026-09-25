@@ -1,5 +1,5 @@
 import Base
-import near-architecture@0.9.1.0/arc.bend as A
+import ../arc/arc.bend as A
 
 # V's deployment layer for an Arc system: services, routes, how each runs, what a change breaks,
 # and the minimality checks against a machine (launch agents, listeners). A project supplies the data.

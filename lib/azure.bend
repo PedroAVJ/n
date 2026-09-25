@@ -1,5 +1,5 @@
 import Base
-import near-architecture@0.9.1.0/arc.bend as Arc
+import ../arc/arc.bend as Arc
 
 # Public metadata and effective ARM permission patterns only. No credential values.
 type Resource is Data:

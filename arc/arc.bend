@@ -831,3 +831,86 @@ def granted(a: Agreement, +person: String, +scope: String) -> List<&2, String>:
     case Agreement{_, _, grants, _}:
       granted.go(grants, person, scope)
 
+
+# ---- kinds, and the emoji each one shows as ----
+# Every kind has exactly one emoji: each function below matches every case, so a new kind without an
+# emoji does not type-check.
+
+# What a system is to the org that owns it.
+type SystemKind is Data:
+  Product{}
+  Project{}
+  Framework{}
+  Library{}
+
+# Who a tenant is: an individual using a system for themselves, or a company.
+type TenantKind is Data:
+  Individual{}
+  Company{}
+
+# A tenant of a system: one of the parties it serves.
+type Tenant is Data:
+  Tenant{key: String, name: String, kind: TenantKind}
+
+def kind_emoji(k: SystemKind) -> String:
+  match k:
+    case Product{}:
+      "📦"
+    case Project{}:
+      "🧪"
+    case Framework{}:
+      "🏗️"
+    case Library{}:
+      "📚"
+
+def tenant_emoji(k: TenantKind) -> String:
+  match k:
+    case Individual{}:
+      "👤"
+    case Company{}:
+      "🏢"
+
+def role_emoji(r: NodeRole) -> String:
+  match r:
+    case UserDevice{}:
+      "🧑‍💻"
+    case Server{}:
+      "🖥️"
+    case Overlay{}:
+      "🔒"
+    case Outside{}:
+      "🌐"
+
+def container_emoji(k: ContainerKind) -> String:
+  match k:
+    case Client{}:
+      "💻"
+    case DataApi{}:
+      "🗄️"
+    case Harness{}:
+      "🤖"
+    case Proxy{}:
+      "🔀"
+    case ModelApi{}:
+      "🧠"
+    case Cli{}:
+      "⌨️"
+    case Worker{}:
+      "⚙️"
+
+def lang_emoji(l: Lang) -> String:
+  match l:
+    case Bend{}:
+      "🌀"
+    case C{}:
+      "🔌"
+    case Rust{}:
+      "🦀"
+    case TypeScript{}:
+      "🟦"
+    case JavaScript{}:
+      "🟨"
+    case Python{}:
+      "🐍"
+    case Opaque{}:
+      "▫️"

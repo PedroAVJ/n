@@ -1,7 +1,7 @@
 import Base
 import ../lib/effs/io.bend as X
 import ../lib/vstr.bend as S
-import ../lib/mac.types.bend as T
+import ../lib/mac_types.bend as T
 import ./project.bend as P
 import ./vazure.bend as Azure
 import bend-net-json@0.3.0.0/json.bend as Json

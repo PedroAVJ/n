@@ -1,5 +1,5 @@
 import Base
-import ./mac.types.bend as T
+import ./mac_types.bend as T
 
 # String and list helpers for V's command line (explicit recursion; Bend's generic ones take compile-time functions).
 

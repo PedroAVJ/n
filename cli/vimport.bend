@@ -1,7 +1,7 @@
 import Base
 import ../lib/effs/io.bend as X
 import ../lib/vstr.bend as S
-import ../lib/mac.types.bend as T
+import ../lib/mac_types.bend as T
 import ./project.bend as P
 import ./vmac.bend as V
 
@@ -234,7 +234,7 @@ def brew_entries(ls: List<&2, String>, +all: List<&2, String>) -> List<&2, Strin
 
 # ---- the files ----
 def mac_text(+vlib: String, title: String, settings: List<&2, String>, fw: String, brew: List<&2, String>) -> String:
-  "import Base\nimport " ++ vlib ++ "/mac.types.bend as T\n\n# " ++ title ++ "\n\ndef settings() -> List<&2, T.Setting>:\n  [\n" ++
+  "import Base\nimport " ++ vlib ++ "/mac_types.bend as T\n\n# " ++ title ++ "\n\ndef settings() -> List<&2, T.Setting>:\n  [\n" ++
   String.join(settings, ",\n") ++ "\n  ]\n\n# The application firewall (T.Firewall: its options exist only while it is on).\ndef firewall() -> T.Firewall:\n  " ++ fw ++
   "\n\ndef brew() -> List<&2, T.Brew>:\n  [\n" ++ String.join(brew, ",\n") ++ "\n  ]\n"
 

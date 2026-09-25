@@ -41,7 +41,7 @@ network, each capability provided exactly once, and a D2 diagram.
 - `lib/deploy.bend`: services, routes and launchd jobs for an Arc system; what a change
   breaks; minimality against the machine (launch agents, listeners); the deploy plan and
   the nix-darwin flake.
-- `lib/mac.types.bend`: a Mac's nix-darwin-labeled settings, declared and observed, and
+- `lib/mac_types.bend`: a Mac's nix-darwin-labeled settings, declared and observed, and
   the typed firewall.
 - `cli/`: the `v` command. The only foreign code is one C effect (`lib/effs/proc_run.c`)
   that runs another program.

@@ -11,7 +11,7 @@ law machine_private:
 law parts_ours:
   {Arc.parts_ours(V.system()) == True{} : Bool}
 
-# Every package V publishes follows the hub's rules (name and version); `v deploy` also requires its LICENSE.
+# Every package V publishes follows the hub's rules (name and version); `v system deploy` also requires its LICENSE.
 law packages_ok:
   {D.packages_ok(V.packages()) == True{} : Bool}
 
@@ -20,10 +20,10 @@ law packages_ok:
 law parts_published:
   {D.parts_published(V.system(), V.packages()) == True{} : Bool}
 
-# The repository reaches GitHub only through `v deploy`: its source lives on GitHub, so it declares a GitHub target.
+# The repository reaches GitHub only through `v system deploy`: its source lives on GitHub, so it declares a GitHub target.
 law source_deployed:
   {D.source_deployed(V.system(), V.targets()) == True{} : Bool}
 
-# What N and V publish is open source, so the repository is public; `v deploy` checks GitHub agrees.
+# What N and V publish is open source, so the repository is public; `v system deploy` checks GitHub agrees.
 law open_source:
   {D.open_source(V.targets()) == True{} : Bool}

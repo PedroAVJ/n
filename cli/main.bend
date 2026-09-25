@@ -1,13 +1,13 @@
-# V: describe a system once, as types, in Bend, and derive everything else from it. Named after Victor Taelin, who created Bend.
+# V: data structures for your Bend algorithms.
 import Base
 import ./v.bend as M
 import ./project.bend as P
 import ./vimport.bend as I
 import ./vdry.bend as D
 
-# The `v` command.
+# The `v` command. Its commands are namespaced by what they act on: `v system ...` for a system.
 def usage() -> IO(Unit):
-  IO.print("usage: v check | plan | snapshot | import | dryrun | deploy | diagram [out.png]")
+  IO.print("usage: v system check | plan | snapshot | import | dryrun | deploy | diagram [out.png]")
 
 def plan() -> IO(Unit):
   do IO<Unit>:
@@ -37,12 +37,19 @@ def run(+cmd: String, rest: List<String>) -> IO(Unit):
   pick_io(String.eq(cmd, "deploy"), M.deploy(),
   pick_io(String.eq(cmd, "diagram"), M.diagram(first_or(rest, "diagram.png")), usage())))))))
 
-def dispatch(args: List<String>) -> IO(Unit):
+def system(args: List<String>) -> IO(Unit):
   match args:
     case []:
       usage()
     case cmd <> rest:
       run(cmd, rest)
+
+def dispatch(args: List<String>) -> IO(Unit):
+  match args:
+    case []:
+      usage()
+    case +ns <> rest:
+      pick_io(String.eq(ns, "system"), system(rest), usage())
 
 def main() -> IO(Unit):
   do IO<Unit>:

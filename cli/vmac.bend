@@ -3,7 +3,7 @@ import ../lib/effs/io.bend as X
 import ../lib/vstr.bend as S
 import bend-net-url@0.4.0.0/url.bend as Url
 
-# The Mac's nix-darwin-labeled state outside `system.defaults` scalars, read for `v import`.
+# The Mac's nix-darwin-labeled state outside `system.defaults` scalars, read for `v system import`.
 # Each reader answers setting lines for mac.now.bend; values are Nix expressions (T.KNix) unless scalar.
 
 def nix_line(name: String, v: String) -> String:

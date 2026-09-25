@@ -13,6 +13,10 @@ Near is the editor where `.n` files are written and their errors shown.
 
 ## V
 
+Data structures for your Bend algorithms: a play on Niklaus Wirth's *Algorithms + Data Structures =
+Programs*. V as in Victor, after Victor Taelin, who created Bend, and the pronunciation of Bend.
+Single characters for things are my brand.
+
 Describe a system once, as types, and derive everything else from it.
 A broken invariant is a compile error, never a runtime surprise.
 
@@ -50,9 +54,9 @@ Packages: `bend-net-json@0.3.0.0` (Tailscale's serve status), `bend-net-url@0.4.
 
 ### Targets
 
-A project declares where it deploys, and `v deploy` runs only those targets:
+A project declares where it deploys, and `v system deploy` runs only those targets:
 
-- `NixDarwin{host}`: configure a Mac with nix-darwin (`v import` and `v dryrun` read and
+- `NixDarwin{host}`: configure a Mac with nix-darwin (`v system import` and `v system dryrun` read and
   diff it). Needs Nix and Homebrew.
 - `TailscaleServe{}`: serve the plan's ports on the private network. Needs Tailscale.
 - `GitHub{repo, public}`: push the project's repository to its main branch. Fails on uncommitted
@@ -60,11 +64,11 @@ A project declares where it deploys, and `v deploy` runs only those targets:
 - `BendHub{}`: publish the project's packages. A package already published with the same
   files is left alone; changed files without a new version fail the deploy.
 
-### V's own architecture
+### This repository's architecture
 
-`arch/` is this repository as a V project: the `v` command, the tools it drives, the Bend hub it deploys
-to and GitHub. Its target is `BendHub`, so `cd arch && v deploy` proves V's laws and
-publishes Arc (`near-architecture`).
+`arch/` is this repository as a V project: N, the `v` command, the tools it drives, GitHub and the
+Bend hub. Its targets are `GitHub` and `BendHub`, so `cd arch && v system deploy` proves the laws,
+pushes the repository and publishes its packages.
 
 ### A project
 
@@ -76,12 +80,12 @@ targets that use them, `plan.bend`, `current.bend`, `flake.bend`, `mac.gen.bend`
 
 ```sh
 bend cli/main.bend -o bin/v     # build v
-v check      # snapshot the machine, then prove the project's laws
-v import     # read the Mac into mac.now.bend (mac.bend keeps its declarations)
-v dryrun     # what applying mac.bend would change, without changing anything
-v plan       # the deploy steps
-v deploy     # prove, then run the project's targets
-v diagram out.png
+v system check      # snapshot the machine, then prove the project's laws
+v system import     # read the Mac into mac.now.bend (mac.bend keeps its declarations)
+v system dryrun     # what applying mac.bend would change, without changing anything
+v system plan       # the deploy steps
+v system deploy     # prove, then run the project's targets
+v system diagram out.png
 ```
 
 ## License

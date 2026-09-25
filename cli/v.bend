@@ -265,7 +265,7 @@ def stack_text(stack: Stack) -> String:
       "def extensions() -> List<&2, String>:\n  [" ++ S.quote_all(extensions) ++ "]\n"
 
 def machine_text(ports: List<&2, String>, serves: List<&2, String>, agents: List<&2, String>, installed: List<&2, String>, exposed: List<&2, String>, stack: Stack) -> String:
-  "import Base\n\n# The machine as it was when `v snapshot` ran. Generated; do not edit.\n\n" ++
+  "import Base\n\n# The machine as it was when `v system snapshot` ran. Generated; do not edit.\n\n" ++
   "def foreign_ports() -> List<&2, U32>:\n  [" ++ String.join(ports, ", ") ++ "]\n\n" ++
   "def foreign_serves() -> List<&2, U32>:\n  [" ++ String.join(serves, ", ") ++ "]\n\n" ++
   "def agents() -> List<&2, String>:\n  [" ++ S.quote_all(agents) ++ "]\n\n" ++
@@ -362,7 +362,7 @@ def serve_steps(ls: List<&2, String>, +web: Json.Val) -> IO(Unit):
         serve_steps(rest, web)
 
 def applied_text(vlib: String, url: String, stores: String) -> String:
-  "import Base\nimport " ++ vlib ++ "/deploy.bend as D\n\n# What is running now (written by `v deploy`). Generated; do not edit.\ndef applied() -> D.Deployment:\n  D.Deployment{\"" ++ url ++ "\", [" ++ stores ++ "]}\n"
+  "import Base\nimport " ++ vlib ++ "/deploy.bend as D\n\n# What is running now (written by `v system deploy`). Generated; do not edit.\ndef applied() -> D.Deployment:\n  D.Deployment{\"" ++ url ++ "\", [" ++ stores ++ "]}\n"
 
 def current_parts(vlib: String, +c: String) -> String:
   applied_text(vlib, String.trim(S.nth(String.lines(c), 0n)), String.trim(S.nth(String.lines(c), 1n)))

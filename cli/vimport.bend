@@ -5,7 +5,7 @@ import ../lib/mac_types.bend as T
 import ./project.bend as P
 import ./vmac.bend as V
 
-# `v import`: read the Mac into mac.now.bend (and, the first time, mac.bend) in the project.
+# `v system import`: read the Mac into mac.now.bend (and, the first time, mac.bend) in the project.
 
 
 # ---- escaping (in vstr.bend) ----
@@ -283,7 +283,7 @@ def after_line(ls: List<&2, String>, +marker: String, prev: Bool) -> String:
       pick(prev, String.trim(l), after_line(rest, marker, String.eq(l, marker)))
 
 def declared_title() -> String:
-  "The Mac as it should be. Edit this; `v dryrun` shows what would change."
+  "The Mac as it should be. Edit this; `v system dryrun` shows what would change."
 
 def write_declared(missing: Bool, +vlib: String, +settings: List<&2, String>, +fw: String, +brew: List<&2, String>) -> IO(Unit):
   match missing:
@@ -315,7 +315,7 @@ def import_mac() -> IO(Unit):
     +settings : List<&2, String> = S.append(prefs, S.append(power_lines(pm), S.append(nm, rest)))
     +bls : List<&2, String> = String.lines(bf)
     +brew : List<&2, String> = brew_entries(bls, bls)
-    X.write_file("mac.now.bend", mac_text(P.vlib_of(f), "The Mac as it is, read by `v import`. Generated; do not edit.", settings, fw, brew))
+    X.write_file("mac.now.bend", mac_text(P.vlib_of(f), "The Mac as it is, read by `v system import`. Generated; do not edit.", settings, fw, brew))
     exists : Bool <- X.ok("test -f mac.bend")
     write_declared(Bool.not(exists), P.vlib_of(f), settings, fw, brew)
     IO.print("import: " ++ Nat.show(S.count(settings)) ++ " settings, " ++ Nat.show(S.count(brew)) ++ " Homebrew entries")

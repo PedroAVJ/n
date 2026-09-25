@@ -5,7 +5,7 @@ import ./project.bend as P
 import ./vimport.bend as I
 import ./vmac.bend as V
 
-# `v dryrun`: what applying the declared Mac (bend/mac.bend) would change, without changing anything.
+# `v system dryrun`: what applying the declared Mac (bend/mac.bend) would change, without changing anything.
 
 def pick(c: Bool, a: String, b: String) -> String:
   I.pick(c, a, b)

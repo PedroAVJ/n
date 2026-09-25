@@ -899,16 +899,24 @@ def lang_emoji(l: Lang) -> String:
     case Opaque{}:
       "▫️"
 
-# ---- owners: who owns a system, and who it serves (its tenants) ----
-# An owner is an individual (one person) or an organization (which has a kind).
+# ---- parties, and the "uses" edge ----
+# A party is who can own or use a system: a human, an organization (which has a kind), a team inside an
+# organization (named by it), or anyone at all.
 type OrgKind is Data:
   Business{}
   Nonprofit{}
   Community{}
 
-type Owner is Data:
-  Individual{name: String, image: String}
+type Party is Data:
+  Human{name: String, image: String}
   Organization{name: String, image: String, kind: OrgKind}
+  Team{name: String, image: String, of: String}
+  Anyone{}
+
+# "uses": an edge from a party to the system it uses, with the channel it gets it through ("" when direct).
+# Its source is a Party by its type, so an edge from anything else does not type-check.
+type Use is Data:
+  Use{party: Party, channel: String}
 
 def org_kind_emoji(k: OrgKind) -> String:
   match k:
@@ -919,25 +927,25 @@ def org_kind_emoji(k: OrgKind) -> String:
     case Community{}:
       "🌱"
 
-def owner_emoji(o: Owner) -> String:
-  match o:
-    case Individual{_, _}:
+def party_emoji(p: Party) -> String:
+  match p:
+    case Human{_, _}:
       "🧑"
     case Organization{_, _, k}:
       org_kind_emoji(k)
-
-# ---- who may use a system ----
-# Private: only its owner. Shared: its owner and the owners named. Open: anyone.
-type Access is Data:
-  Private{}
-  Shared{with: List<&2, String>}
-  Open{}
-
-def access_emoji(a: Access) -> String:
-  match a:
-    case Private{}:
-      "🔒"
-    case Shared{_}:
+    case Team{_, _, _}:
       "👥"
-    case Open{}:
+    case Anyone{}:
       "🌍"
+
+# Only a human or an organization can own a system.
+def can_own(p: Party) -> Bool:
+  match p:
+    case Human{_, _}:
+      True{}
+    case Organization{_, _, _}:
+      True{}
+    case Team{_, _, _}:
+      False{}
+    case Anyone{}:
+      False{}

@@ -55,22 +55,19 @@ def packages() -> List<&2, D.Package>:
   [ D.Package{"near-architecture", "0.9.1.0", "../arc/arc.bend", ["arc"]},
     D.Package{"near-v-framework", "0.2.0.0", "../v.bend", ["cli", "lib", "proc"]} ]
 
-# ---- what this system is, who owns it, and who it serves ----
+# ---- what this system is, who owns it, and who uses it ----
 def name() -> String:
   "V"
 
 def image() -> String:
   "v-logo.svg"
 
-def owner() -> A.Owner:
-  A.Individual{"Pedro", "https://github.com/PedroAVJ.png"}
+def owner() -> A.Party:
+  A.Human{"Pedro", "https://github.com/PedroAVJ.png"}
 
 def kind() -> A.SystemKind:
   A.Product{}
 
-def access() -> A.Access:
-  A.Open{}
-
-# Tenants: only for a product that serves several separate customers, each with its own data.
-def tenants() -> List<&2, A.Owner>:
-  []
+# Who uses it: each "uses" edge names a party and the channel it comes through ("" when direct).
+def uses() -> List<&2, A.Use>:
+  [A.Use{A.Human{"Pedro", "https://github.com/PedroAVJ.png"}, ""}, A.Use{A.Anyone{}, "the Bend hub"}]

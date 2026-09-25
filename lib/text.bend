@@ -418,19 +418,25 @@ def program_type(k: A.ContainerKind) -> String:
     case A.Worker{}:
       "Worker"
 
-def owner_json(+o: A.Owner) -> String:
-  match o:
-    case A.Individual{+name, image}:
-      entity(name, name, image, "Individual", A.owner_emoji(o), [], "")
+def party_json(+p: A.Party, +channel: String) -> String:
+  match p:
+    case A.Human{+name, image}:
+      entity(name, name, image, "Human", A.party_emoji(p), [prop("channel", channel)], "")
     case A.Organization{+name, image, +k}:
-      entity(name, name, image, org_type(k), A.owner_emoji(o), [], "")
+      entity(name, name, image, org_type(k), A.party_emoji(p), [prop("channel", channel)], "")
+    case A.Team{+name, image, of}:
+      entity(name, name, image, "Team", A.party_emoji(p), [prop("of", of), prop("channel", channel)], "")
+    case A.Anyone{}:
+      entity("anyone", "Anyone", "", "Anyone", A.party_emoji(p), [prop("channel", channel)], "")
 
-def owners_json(os: List<&2, A.Owner>) -> List<&2, String>:
-  match os:
+def uses_json(us: List<&2, A.Use>) -> List<&2, String>:
+  match us:
     case []:
       []
-    case o <> rest:
-      owner_json(o) <> owners_json(rest)
+    case u <> rest:
+      match u:
+        case A.Use{p, c}:
+          party_json(p, c) <> uses_json(rest)
 
 def nodes_json(ns: List<&2, A.Node>) -> List<&2, String>:
   match ns:
@@ -468,14 +474,6 @@ def links_json(ls: List<&2, A.Link>) -> List<&2, String>:
         case A.Link{a, b, label, _}:
           ("{\"src\":" ++ jstr(a) ++ ",\"dst\":" ++ jstr(b) ++ ",\"label\":" ++ jstr(label) ++ "}") <> links_json(rest)
 
-def access_name(a: A.Access) -> String:
-  match a:
-    case A.Private{}:
-      "private"
-    case A.Shared{with}:
-      "shared with " ++ String.join(with, ", ")
-    case A.Open{}:
-      "public"
 
 # What a product ships as: the kinds of the programs it builds itself, and a Bend library if it
 # publishes packages.
@@ -493,9 +491,9 @@ def ships_as(+s: A.System, library: Bool) -> String:
 
 # The graph as JSON: the system and its owner, tenants, machines, programs, parts and links, from its
 # one start (the proof rules out a system with several).
-def json(+s: A.System, +name: String, +image: String, +owner: A.Owner, +kind: A.SystemKind, +access: A.Access, library: Bool, ts: List<&2, A.Owner>, ok: {one_start(s) == True{} : Bool}) -> String:
-  "{\"system\":" ++ entity(name, name, image, system_type(kind), A.kind_emoji(kind), [prop("access", access_name(access)), prop("ships as", ships_as(s, library))], ",\"access\":" ++ jstr(A.access_emoji(access))) ++
-  ",\"owner\":" ++ owner_json(owner) ++ ",\"tenants\":" ++ jlist(owners_json(ts)) ++
+def json(+s: A.System, +name: String, +image: String, +owner: A.Party, +kind: A.SystemKind, library: Bool, us: List<&2, A.Use>, ok: {one_start(s) == True{} : Bool}, owned: {A.can_own(owner) == True{} : Bool}) -> String:
+  "{\"system\":" ++ entity(name, name, image, system_type(kind), A.kind_emoji(kind), [prop("ships as", ships_as(s, library))], "") ++
+  ",\"owner\":" ++ party_json(owner, "") ++ ",\"users\":" ++ jlist(uses_json(us)) ++
   ",\"start\":" ++ jstr(head_or(starts(programs(s), program_links(A.links(s), s)), "")) ++
   ",\"machines\":" ++ jlist(nodes_json(A.nodes(s))) ++ ",\"programs\":" ++ jlist(containers_json(A.containers(s))) ++
   ",\"parts\":" ++ jlist(parts_json(A.parts(s))) ++ ",\"links\":" ++ jlist(links_json(A.links(s))) ++ "}"

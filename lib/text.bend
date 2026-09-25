@@ -468,10 +468,33 @@ def links_json(ls: List<&2, A.Link>) -> List<&2, String>:
         case A.Link{a, b, label, _}:
           ("{\"src\":" ++ jstr(a) ++ ",\"dst\":" ++ jstr(b) ++ ",\"label\":" ++ jstr(label) ++ "}") <> links_json(rest)
 
+def access_name(a: A.Access) -> String:
+  match a:
+    case A.Private{}:
+      "private"
+    case A.Shared{with}:
+      "shared with " ++ String.join(with, ", ")
+    case A.Open{}:
+      "public"
+
+# What a product ships as: the kinds of the programs it builds itself, and a Bend library if it
+# publishes packages.
+def own_types(cs: List<&2, A.Container>) -> List<&2, String>:
+  match cs:
+    case []:
+      []
+    case c <> rest:
+      match c:
+        case A.Container{_, _, kind, owner, _, _, _, _, _, _, _, _}:
+          keep_new(Bool.not(A.is_ours(owner)), program_type(kind), own_types(rest))
+
+def ships_as(+s: A.System, library: Bool) -> String:
+  String.join(List.append(&2, String, List.reverse(&2, String, fresh(own_types(A.containers(s)), [], [])), keep_new(Bool.not(library), "Bend library", [])), ", ")
+
 # The graph as JSON: the system and its owner, tenants, machines, programs, parts and links, from its
 # one start (the proof rules out a system with several).
-def json(+s: A.System, +name: String, +image: String, +owner: A.Owner, +kind: A.SystemKind, ts: List<&2, A.Owner>, ok: {one_start(s) == True{} : Bool}) -> String:
-  "{\"system\":" ++ entity(name, name, image, system_type(kind), A.kind_emoji(kind), [], "") ++
+def json(+s: A.System, +name: String, +image: String, +owner: A.Owner, +kind: A.SystemKind, +access: A.Access, library: Bool, ts: List<&2, A.Owner>, ok: {one_start(s) == True{} : Bool}) -> String:
+  "{\"system\":" ++ entity(name, name, image, system_type(kind), A.kind_emoji(kind), [prop("access", access_name(access)), prop("ships as", ships_as(s, library))], ",\"access\":" ++ jstr(A.access_emoji(access))) ++
   ",\"owner\":" ++ owner_json(owner) ++ ",\"tenants\":" ++ jlist(owners_json(ts)) ++
   ",\"start\":" ++ jstr(head_or(starts(programs(s), program_links(A.links(s), s)), "")) ++
   ",\"machines\":" ++ jlist(nodes_json(A.nodes(s))) ++ ",\"programs\":" ++ jlist(containers_json(A.containers(s))) ++

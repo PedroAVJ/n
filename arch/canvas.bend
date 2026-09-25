@@ -68,5 +68,9 @@ def owner() -> A.Owner:
 def kind() -> A.SystemKind:
   A.Product{}
 
+def access() -> A.Access:
+  A.Open{}
+
+# Tenants: only for a product that serves several separate customers, each with its own data.
 def tenants() -> List<&2, A.Owner>:
-  [A.Individual{"Pedro", "https://github.com/PedroAVJ.png"}]
+  []

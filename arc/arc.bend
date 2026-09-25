@@ -925,3 +925,19 @@ def owner_emoji(o: Owner) -> String:
       "🧑"
     case Organization{_, _, k}:
       org_kind_emoji(k)
+
+# ---- who may use a system ----
+# Private: only its owner. Shared: its owner and the owners named. Open: anyone.
+type Access is Data:
+  Private{}
+  Shared{with: List<&2, String>}
+  Open{}
+
+def access_emoji(a: Access) -> String:
+  match a:
+    case Private{}:
+      "🔒"
+    case Shared{_}:
+      "👥"
+    case Open{}:
+      "🌍"

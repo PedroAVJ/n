@@ -399,7 +399,7 @@ def role_type(r: A.NodeRole) -> String:
     case A.Overlay{}:
       "Private network"
     case A.Outside{}:
-      "Outside"
+      "Internet"
 
 def program_type(k: A.ContainerKind) -> String:
   match k:

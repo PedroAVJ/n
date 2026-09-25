@@ -8,8 +8,8 @@ import ../lib/deploy.bend as D
 
 # ---- where it runs: whoever uses V, on their own computer ----
 def nodes() -> List<&2, A.Node>:
-  [ A.Node{"machine", "Your computer", A.UserDevice{}, A.Other{}},
-    A.Node{"outside", "Outside", A.Outside{}, A.Other{}} ]
+  [ A.Node{"machine", "Mac mini", A.UserDevice{}, A.Other{}},
+    A.Node{"outside", "Internet", A.Outside{}, A.Other{}} ]
 
 def org() -> A.Org:
   A.Org{"Pedro", A.Vendor{"Apple", "iCloud"}, []}

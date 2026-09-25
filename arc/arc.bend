@@ -949,3 +949,68 @@ def can_own(p: Party) -> Bool:
       False{}
     case Anyone{}:
       False{}
+
+# "uses" edges are minimal: none is implied by another. Anyone covers every party, so it stands alone;
+# an organization covers its own teams, so a team is not listed beside it.
+def is_anyone(p: Party) -> Bool:
+  match p:
+    case Anyone{}:
+      True{}
+    case Human{_, _}:
+      False{}
+    case Organization{_, _, _}:
+      False{}
+    case Team{_, _, _}:
+      False{}
+
+def has_anyone(us: List<&2, Use>) -> Bool:
+  match us:
+    case []:
+      False{}
+    case u <> rest:
+      match u:
+        case Use{p, _}:
+          is_anyone(p) || has_anyone(rest)
+
+def org_named(+name: String, p: Party) -> Bool:
+  match p:
+    case Organization{n, _, _}:
+      String.eq(n, name)
+    case Human{_, _}:
+      False{}
+    case Team{_, _, _}:
+      False{}
+    case Anyone{}:
+      False{}
+
+def org_listed(+name: String, us: List<&2, Use>) -> Bool:
+  match us:
+    case []:
+      False{}
+    case u <> rest:
+      match u:
+        case Use{p, _}:
+          org_named(name, p) || org_listed(name, rest)
+
+def team_of_listed(p: Party, +all: List<&2, Use>) -> Bool:
+  match p:
+    case Team{_, _, of}:
+      org_listed(of, all)
+    case Human{_, _}:
+      False{}
+    case Organization{_, _, _}:
+      False{}
+    case Anyone{}:
+      False{}
+
+def teams_covered(us: List<&2, Use>, +all: List<&2, Use>) -> Bool:
+  match us:
+    case []:
+      False{}
+    case u <> rest:
+      match u:
+        case Use{p, _}:
+          team_of_listed(p, all) || teams_covered(rest, all)
+
+def uses_minimal(+us: List<&2, Use>) -> Bool:
+  (Bool.not(has_anyone(us)) || Nat.is_eq(List.length(&2, Use, us), 1n)) && Bool.not(teams_covered(us, us))

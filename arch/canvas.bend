@@ -63,11 +63,11 @@ def image() -> String:
   "v-logo.svg"
 
 def owner() -> A.Party:
-  A.Human{"Pedro", "https://github.com/PedroAVJ.png"}
+  A.Human{"Pedro", "https://avatars.githubusercontent.com/PedroAVJ?s=256"}
 
 def kind() -> A.SystemKind:
   A.Product{}
 
 # Who uses it: each "uses" edge names a party and the channel it comes through ("" when direct).
 def uses() -> List<&2, A.Use>:
-  [A.Use{A.Human{"Pedro", "https://github.com/PedroAVJ.png"}, ""}, A.Use{A.Anyone{}, "the Bend hub"}]
+  [A.Use{A.Anyone{}, "the Bend hub"}]

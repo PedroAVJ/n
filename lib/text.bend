@@ -491,7 +491,7 @@ def ships_as(+s: A.System, library: Bool) -> String:
 
 # The graph as JSON: the system and its owner, tenants, machines, programs, parts and links, from its
 # one start (the proof rules out a system with several).
-def json(+s: A.System, +name: String, +image: String, +owner: A.Party, +kind: A.SystemKind, library: Bool, us: List<&2, A.Use>, ok: {one_start(s) == True{} : Bool}, owned: {A.can_own(owner) == True{} : Bool}) -> String:
+def json(+s: A.System, +name: String, +image: String, +owner: A.Party, +kind: A.SystemKind, library: Bool, +us: List<&2, A.Use>, ok: {one_start(s) == True{} : Bool}, owned: {A.can_own(owner) == True{} : Bool}, minimal: {A.uses_minimal(us) == True{} : Bool}) -> String:
   "{\"system\":" ++ entity(name, name, image, system_type(kind), A.kind_emoji(kind), [prop("ships as", ships_as(s, library))], "") ++
   ",\"owner\":" ++ party_json(owner, "") ++ ",\"users\":" ++ jlist(uses_json(us)) ++
   ",\"start\":" ++ jstr(head_or(starts(programs(s), program_links(A.links(s), s)), "")) ++

@@ -59,11 +59,15 @@ def packages() -> List<&2, D.Package>:
 def name() -> String:
   "V"
 
-def image() -> String:
-  "v-logo.svg"
+def image() -> A.Imagery:
+  A.Logo{"v-logo.svg"}
+
+# Images for machines, programs and parts that have one of their own.
+def pictures() -> List<&2, A.Picture>:
+  [A.Picture{"machine", A.Icon{"mac-mini.png"}}]
 
 def owner() -> A.Party:
-  A.Human{"Pedro", "https://avatars.githubusercontent.com/PedroAVJ?s=256"}
+  A.Human{"Pedro", A.Photo{"https://avatars.githubusercontent.com/PedroAVJ?s=256"}}
 
 def kind() -> A.SystemKind:
   A.Product{}

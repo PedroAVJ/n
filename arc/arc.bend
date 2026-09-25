@@ -899,6 +899,20 @@ def lang_emoji(l: Lang) -> String:
     case Opaque{}:
       "▫️"
 
+# ---- images ----
+# What an object shows as: nothing of its own (its type's emoji), an emoji, an icon (like a device's
+# official icon), a logo, or a photo. The last three name a file or address.
+type Imagery is Data:
+  Plain{}
+  Emoji{text: String}
+  Icon{src: String}
+  Logo{src: String}
+  Photo{src: String}
+
+# An image for the object with this key (a machine, program or part).
+type Picture is Data:
+  Picture{key: String, image: Imagery}
+
 # ---- parties, and the "uses" edge ----
 # A party is who can own or use a system: a human, an organization (which has a kind), a team inside an
 # organization (named by it), or anyone at all.
@@ -908,9 +922,9 @@ type OrgKind is Data:
   Community{}
 
 type Party is Data:
-  Human{name: String, image: String}
-  Organization{name: String, image: String, kind: OrgKind}
-  Team{name: String, image: String, of: String}
+  Human{name: String, image: Imagery}
+  Organization{name: String, image: Imagery, kind: OrgKind}
+  Team{name: String, image: Imagery, of: String}
   Anyone{}
 
 # "uses": an edge from a party to the system it uses, with the channel it gets it through ("" when direct).

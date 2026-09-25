@@ -366,8 +366,34 @@ def lang_name(l: A.Lang) -> String:
 def prop(k: String, v: String) -> String:
   jstr(k) ++ ":" ++ jstr(v)
 
-def entity(key: String, name: String, image: String, ty: String, emoji: String, ps: List<&2, String>, rel: String) -> String:
-  "{\"key\":" ++ jstr(key) ++ ",\"name\":" ++ jstr(name) ++ ",\"image\":" ++ jstr(image) ++ ",\"type\":" ++ jstr(ty) ++ ",\"emoji\":" ++ jstr(emoji) ++ ",\"properties\":{" ++ String.join(ps, ",") ++ "}" ++ rel ++ "}"
+def image_kind(i: A.Imagery) -> String:
+  match i:
+    case A.Plain{}:
+      "none"
+    case A.Emoji{_}:
+      "emoji"
+    case A.Icon{_}:
+      "icon"
+    case A.Logo{_}:
+      "logo"
+    case A.Photo{_}:
+      "photo"
+
+def image_src(i: A.Imagery) -> String:
+  match i:
+    case A.Plain{}:
+      ""
+    case A.Emoji{t}:
+      t
+    case A.Icon{u}:
+      u
+    case A.Logo{u}:
+      u
+    case A.Photo{u}:
+      u
+
+def entity(key: String, name: String, +image: A.Imagery, ty: String, emoji: String, ps: List<&2, String>, rel: String) -> String:
+  "{\"key\":" ++ jstr(key) ++ ",\"name\":" ++ jstr(name) ++ ",\"image\":" ++ jstr(image_src(image)) ++ ",\"imageKind\":" ++ jstr(image_kind(image)) ++ ",\"type\":" ++ jstr(ty) ++ ",\"emoji\":" ++ jstr(emoji) ++ ",\"properties\":{" ++ String.join(ps, ",") ++ "}" ++ rel ++ "}"
 
 # ---- each object's type, named by its most specific kind ----
 def org_type(k: A.OrgKind) -> String:
@@ -427,7 +453,7 @@ def party_json(+p: A.Party, +channel: String) -> String:
     case A.Team{+name, image, of}:
       entity(name, name, image, "Team", A.party_emoji(p), [prop("of", of), prop("channel", channel)], "")
     case A.Anyone{}:
-      entity("anyone", "Anyone", "", "Anyone", A.party_emoji(p), [prop("channel", channel)], "")
+      entity("anyone", "Anyone", A.Plain{}, "Anyone", A.party_emoji(p), [prop("channel", channel)], "")
 
 def uses_json(us: List<&2, A.Use>) -> List<&2, String>:
   match us:
@@ -438,32 +464,48 @@ def uses_json(us: List<&2, A.Use>) -> List<&2, String>:
         case A.Use{p, c}:
           party_json(p, c) <> uses_json(rest)
 
-def nodes_json(ns: List<&2, A.Node>) -> List<&2, String>:
+def pick_image(c: Bool, a: A.Imagery, b: A.Imagery) -> A.Imagery:
+  match c:
+    case True{}:
+      a
+    case False{}:
+      b
+
+def picture_of(+k: String, ps: List<&2, A.Picture>) -> A.Imagery:
+  match ps:
+    case []:
+      A.Plain{}
+    case p <> rest:
+      match p:
+        case A.Picture{pk, i}:
+          pick_image(String.eq(k, pk), i, picture_of(k, rest))
+
+def nodes_json(ns: List<&2, A.Node>, +pics: List<&2, A.Picture>) -> List<&2, String>:
   match ns:
     case []:
       []
     case n <> rest:
       match n:
         case A.Node{+k, name, +role, host}:
-          entity(k, name, "", role_type(role), A.role_emoji(role), [prop("key", k), prop("host", host_name(host))], ",\"role\":" ++ jstr(role_name(role))) <> nodes_json(rest)
+          entity(k, name, picture_of(k, pics), role_type(role), A.role_emoji(role), [prop("key", k), prop("host", host_name(host))], ",\"role\":" ++ jstr(role_name(role))) <> nodes_json(rest, pics)
 
-def containers_json(cs: List<&2, A.Container>) -> List<&2, String>:
+def containers_json(cs: List<&2, A.Container>, +pics: List<&2, A.Picture>) -> List<&2, String>:
   match cs:
     case []:
       []
     case c <> rest:
       match c:
         case A.Container{+k, name, +kind, owner, +on, _, _, _, +vendors, +frameworks, libraries, languages}:
-          entity(k, name, "", program_type(kind), A.container_emoji(kind), [prop("key", k), prop("owner", owner_name(owner)), prop("vendors", String.join(vendors, ", ")), prop("frameworks", String.join(frameworks, ", ")), prop("libraries", String.join(libraries, ", ")), prop("languages", String.join(languages, ", "))], ",\"node\":" ++ jstr(on) ++ ",\"brands\":" ++ jlist(jstrs(List.append(&2, String, vendors, frameworks)))) <> containers_json(rest)
+          entity(k, name, picture_of(k, pics), program_type(kind), A.container_emoji(kind), [prop("key", k), prop("owner", owner_name(owner)), prop("vendors", String.join(vendors, ", ")), prop("frameworks", String.join(frameworks, ", ")), prop("libraries", String.join(libraries, ", ")), prop("languages", String.join(languages, ", "))], ",\"node\":" ++ jstr(on) ++ ",\"brands\":" ++ jlist(jstrs(List.append(&2, String, vendors, frameworks)))) <> containers_json(rest, pics)
 
-def parts_json(ps: List<&2, A.Part>) -> List<&2, String>:
+def parts_json(ps: List<&2, A.Part>, +pics: List<&2, A.Picture>) -> List<&2, String>:
   match ps:
     case []:
       []
     case p <> rest:
       match p:
         case A.Part{+k, name, +lang, +i, +on}:
-          entity(k, name, "", lang_name(lang) ++ " part", A.lang_emoji(lang), [prop("key", k), prop("program", i), prop("machine", on)], ",\"program\":" ++ jstr(i) ++ ",\"node\":" ++ jstr(on)) <> parts_json(rest)
+          entity(k, name, picture_of(k, pics), lang_name(lang) ++ " part", A.lang_emoji(lang), [prop("key", k), prop("program", i), prop("machine", on)], ",\"program\":" ++ jstr(i) ++ ",\"node\":" ++ jstr(on)) <> parts_json(rest, pics)
 
 def links_json(ls: List<&2, A.Link>) -> List<&2, String>:
   match ls:
@@ -491,9 +533,9 @@ def ships_as(+s: A.System, library: Bool) -> String:
 
 # The graph as JSON: the system and its owner, tenants, machines, programs, parts and links, from its
 # one start (the proof rules out a system with several).
-def json(+s: A.System, +name: String, +image: String, +owner: A.Party, +kind: A.SystemKind, library: Bool, +us: List<&2, A.Use>, ok: {one_start(s) == True{} : Bool}, owned: {A.can_own(owner) == True{} : Bool}, minimal: {A.uses_minimal(us) == True{} : Bool}) -> String:
+def json(+s: A.System, +name: String, +image: A.Imagery, +pics: List<&2, A.Picture>, +owner: A.Party, +kind: A.SystemKind, library: Bool, +us: List<&2, A.Use>, ok: {one_start(s) == True{} : Bool}, owned: {A.can_own(owner) == True{} : Bool}, minimal: {A.uses_minimal(us) == True{} : Bool}) -> String:
   "{\"system\":" ++ entity(name, name, image, system_type(kind), A.kind_emoji(kind), [prop("ships as", ships_as(s, library))], "") ++
   ",\"owner\":" ++ party_json(owner, "") ++ ",\"users\":" ++ jlist(uses_json(us)) ++
   ",\"start\":" ++ jstr(head_or(starts(programs(s), program_links(A.links(s), s)), "")) ++
-  ",\"machines\":" ++ jlist(nodes_json(A.nodes(s))) ++ ",\"programs\":" ++ jlist(containers_json(A.containers(s))) ++
-  ",\"parts\":" ++ jlist(parts_json(A.parts(s))) ++ ",\"links\":" ++ jlist(links_json(A.links(s))) ++ "}"
+  ",\"machines\":" ++ jlist(nodes_json(A.nodes(s), pics)) ++ ",\"programs\":" ++ jlist(containers_json(A.containers(s), pics)) ++
+  ",\"parts\":" ++ jlist(parts_json(A.parts(s), pics)) ++ ",\"links\":" ++ jlist(links_json(A.links(s))) ++ "}"

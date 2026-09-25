@@ -63,7 +63,7 @@ type ContainerKind is Data:
   Worker{}
 
 # Whether the project builds and runs it, or uses it as it is.
-type Owner is Data:
+type Ownership is Data:
   Ours{}
   Theirs{}
 
@@ -95,7 +95,7 @@ type Lang is Data:
   Opaque{}
 
 type Container is Data:
-  Container{key: String, name: String, kind: ContainerKind, owner: Owner, on: String, exposure: Exposure, caps: List<&2, Cap>, source: String, vendors: List<&2, String>, frameworks: List<&2, String>, libraries: List<&2, String>, languages: List<&2, String>}
+  Container{key: String, name: String, kind: ContainerKind, owner: Ownership, on: String, exposure: Exposure, caps: List<&2, Cap>, source: String, vendors: List<&2, String>, frameworks: List<&2, String>, libraries: List<&2, String>, languages: List<&2, String>}
 
 type Part is Data:
   Part{key: String, name: String, lang: Lang, in: String, on: String}
@@ -256,7 +256,7 @@ def is_data_api(k: ContainerKind) -> Bool:
     case _:
       False{}
 
-def is_ours(o: Owner) -> Bool:
+def is_ours(o: Ownership) -> Bool:
   match o:
     case Ours{}:
       True{}
@@ -843,15 +843,6 @@ type SystemKind is Data:
   Framework{}
   Library{}
 
-# Who a tenant is: an individual using a system for themselves, or a company.
-type TenantKind is Data:
-  Individual{}
-  Company{}
-
-# A tenant of a system: one of the parties it serves.
-type Tenant is Data:
-  Tenant{key: String, name: String, kind: TenantKind}
-
 def kind_emoji(k: SystemKind) -> String:
   match k:
     case Product{}:
@@ -862,13 +853,6 @@ def kind_emoji(k: SystemKind) -> String:
       "🏗️"
     case Library{}:
       "📚"
-
-def tenant_emoji(k: TenantKind) -> String:
-  match k:
-    case Individual{}:
-      "👤"
-    case Company{}:
-      "🏢"
 
 def role_emoji(r: NodeRole) -> String:
   match r:
@@ -914,3 +898,30 @@ def lang_emoji(l: Lang) -> String:
       "🐍"
     case Opaque{}:
       "▫️"
+
+# ---- owners: who owns a system, and who it serves (its tenants) ----
+# An owner is an individual (one person) or an organization (which has a kind).
+type OrgKind is Data:
+  Business{}
+  Nonprofit{}
+  Community{}
+
+type Owner is Data:
+  Individual{name: String, image: String}
+  Organization{name: String, image: String, kind: OrgKind}
+
+def org_kind_emoji(k: OrgKind) -> String:
+  match k:
+    case Business{}:
+      "🏢"
+    case Nonprofit{}:
+      "🤝"
+    case Community{}:
+      "🌱"
+
+def owner_emoji(o: Owner) -> String:
+  match o:
+    case Individual{_, _}:
+      "🧑"
+    case Organization{_, _, k}:
+      org_kind_emoji(k)

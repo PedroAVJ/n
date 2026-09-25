@@ -66,7 +66,7 @@ def owner() -> A.Owner:
   A.Individual{"Pedro", "https://github.com/PedroAVJ.png"}
 
 def kind() -> A.SystemKind:
-  A.Framework{}
+  A.Product{}
 
 def tenants() -> List<&2, A.Owner>:
   [A.Individual{"Pedro", "https://github.com/PedroAVJ.png"}]

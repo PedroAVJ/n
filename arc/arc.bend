@@ -846,7 +846,7 @@ type SystemKind is Data:
 def kind_emoji(k: SystemKind) -> String:
   match k:
     case Product{}:
-      "📦"
+      "❤️‍🩹"
     case Project{}:
       "🧪"
     case Framework{}:

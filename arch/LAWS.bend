@@ -2,6 +2,7 @@ import Base
 import near-architecture@0.9.1.0/arc.bend as Arc
 import ../lib/deploy.bend as D
 import ./canvas.bend as V
+import ./sources.bend as Src
 
 # V is well formed, and what runs on the machine is reachable only from it or the private network.
 law well_formed:
@@ -27,3 +28,11 @@ law source_deployed:
 # What N and V publish is open source, so the repository is public; `v system deploy` checks GitHub agrees.
 law open_source:
   {D.open_source(V.targets()) == True{} : Bool}
+
+# No dead code: every source file ships in a package.
+law no_dead_code:
+  {D.no_dead_code(Src.all_files(), Src.project(), Src.shipped()) == True{} : Bool}
+
+# Bend only: every file is Bend source or a C effect, apart from the license, readme and ignore list.
+law bend_only:
+  {D.bend_only(Src.all_files()) == True{} : Bool}

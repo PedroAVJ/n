@@ -56,5 +56,5 @@ def targets() -> List<&2, D.Target>:
 
 def packages() -> List<&2, D.Package>:
   [ D.Package{"near-architecture", "0.9.1.0", "../arc/arc.bend", ["arc"]},
-    D.Package{"near-v-framework", "0.1.0.0", "../cli/main.bend", ["cli", "lib", "proc"]},
+    D.Package{"near-v-framework", "0.2.0.0", "../v.bend", ["cli", "lib", "proc"]},
     D.Package{"near-n-checker", "0.1.0.0", "../n.bend", ["checker"]} ]

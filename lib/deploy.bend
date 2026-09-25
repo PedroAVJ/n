@@ -507,6 +507,51 @@ type Target is Data:
 type Package is Data:
   Package{name: String, version: String, entry: String, parts: List<&2, String>}
 
+# ---- no dead code, Bend only ----
+# Every library definition is an entry point for whoever imports it, so a repository of packages has
+# dead code exactly when a source file ships in no package.
+def listed(+x: String, ys: List<&2, String>) -> Bool:
+  match ys:
+    case []:
+      False{}
+    case y <> rest:
+      String.eq(x, y) || listed(x, rest)
+
+def is_source(+f: String) -> Bool:
+  String.ends_with(f, ".bend") || String.ends_with(f, ".c")
+
+def first_or_empty(xs: List<&2, String>) -> String:
+  match xs:
+    case []:
+      ""
+    case x <> _:
+      x
+
+def base_name(f: String) -> String:
+  first_or_empty(List.reverse(&2, String, String.split(f, '/')))
+
+# A file that is neither Bend source nor a C effect: only the license, readme and ignore list may be.
+def allowed(+f: String) -> Bool:
+  is_source(f) || String.eq(base_name(f), "LICENSE") || String.eq(f, "README.md") || String.eq(f, ".gitignore")
+
+def bend_only(fs: List<&2, String>) -> Bool:
+  match fs:
+    case []:
+      True{}
+    case +f <> rest:
+      allowed(f) && bend_only(rest)
+
+# The project's own folder (its architecture) is configuration, not shipped code.
+def needs_shipping(+f: String, +project: String) -> Bool:
+  is_source(f) && Bool.not(String.starts_with(f, project ++ "/"))
+
+def no_dead_code(fs: List<&2, String>, +project: String, +shipped: List<&2, String>) -> Bool:
+  match fs:
+    case []:
+      True{}
+    case +f <> rest:
+      (Bool.not(needs_shipping(f, project)) || listed(f, shipped)) && no_dead_code(rest, project, shipped)
+
 # ---- the repository is deployed through V ----
 def is_github(t: Target) -> Bool:
   match t:

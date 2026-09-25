@@ -1,4 +1,3 @@
-# V: data structures for your Bend algorithms.
 import Base
 import ./v.bend as M
 import ./project.bend as P

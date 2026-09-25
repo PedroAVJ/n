@@ -4,6 +4,7 @@ import ../lib/vstr.bend as S
 import ../lib/mac_types.bend as T
 import ./project.bend as P
 import ./vazure.bend as Azure
+import ./vsources.bend as Src
 import bend-net-json@0.3.0.0/json.bend as Json
 
 # V's command line, run in a project's folder. All logic is Bend; other programs run through
@@ -310,6 +311,7 @@ def check_with(+f: P.Facts) -> IO(Unit):
   do IO<Unit>:
     P.when(P.has_target(f, "nix-darwin"), snapshot(f))
     P.when(P.has_target(f, "azure"), Azure.snapshot(f))
+    P.when(P.has_target(f, "bend-hub"), Src.write_sources(f))
     prove()
 
 def check() -> IO(Unit):
@@ -322,6 +324,7 @@ def snapshot_only() -> IO(Unit):
     +f : P.Facts <- P.read_facts()
     P.when(P.has_target(f, "nix-darwin"), snapshot(f))
     P.when(P.has_target(f, "azure"), Azure.snapshot(f))
+    P.when(P.has_target(f, "bend-hub"), Src.write_sources(f))
 
 def diagram(+out: String) -> IO(Unit):
   do IO<Unit>:

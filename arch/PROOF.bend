@@ -15,3 +15,7 @@ def Laws.source_deployed():
   {==}
 def Laws.open_source():
   {==}
+def Laws.no_dead_code():
+  {==}
+def Laws.bend_only():
+  {==}

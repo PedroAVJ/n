@@ -2,22 +2,21 @@ import Base
 import near-architecture@0.9.1.0/arc.bend as A
 import ../lib/deploy.bend as D
 
-# This repository's architecture (N and V), written with Arc. V deploys by publishing its packages to the Bend hub
+# V's architecture, written with Arc. V deploys by publishing its packages to the Bend hub
 # (its only target); its source lives on GitHub. Nix, Homebrew and the Tailscale CLI are tools V
 # drives only for projects that declare those targets.
 
-# ---- where it runs ----
+# ---- where it runs: whoever uses V, on their own computer ----
 def nodes() -> List<&2, A.Node>:
-  [ A.Node{"machine", "Mac mini", A.Server{}, A.Owned{"machine"}},
+  [ A.Node{"machine", "Your computer", A.UserDevice{}, A.Other{}},
     A.Node{"outside", "Outside", A.Outside{}, A.Other{}} ]
 
 def org() -> A.Org:
-  A.Org{"Pedro", A.Vendor{"Apple", "iCloud"}, [A.PhysicalDevice{"machine", "Mac mini", "macOS"}]}
+  A.Org{"Pedro", A.Vendor{"Apple", "iCloud"}, []}
 
 # ---- what it is ----
 def near() -> List<&2, A.Container>:
   [ A.Container{"v", "v", A.Cli{}, A.Ours{}, "machine", A.Local{}, [], "", [], [], [], ["Bend 2", "C"]},
-    A.Container{"n", "N", A.Cli{}, A.Ours{}, "machine", A.Local{}, [], "", [], [], [], ["Bend 2"]},
     A.Container{"bend", "Bend", A.Cli{}, A.Theirs{}, "machine", A.Local{}, [], "", [], [], [], ["Bend 2"]},
     A.Container{"nix", "Nix · nix-darwin", A.Cli{}, A.Theirs{}, "machine", A.Local{}, [], "", [], ["Nix", "nix-darwin"], [], []},
     A.Container{"brew", "Homebrew", A.Cli{}, A.Theirs{}, "machine", A.Local{}, [], "", ["Homebrew"], [], [], []},
@@ -30,8 +29,7 @@ def parts() -> List<&2, A.Part>:
   [ A.Part{"cli", "v command (check, import, dryrun, plan, deploy, diagram)", A.Bend{}, "v", "machine"},
     A.Part{"arc", "Arc (near-architecture)", A.Bend{}, "v", "machine"},
     A.Part{"lib", "Deploy and Mac library", A.Bend{}, "v", "machine"},
-    A.Part{"proc", "Run-a-program effect", A.C{}, "v", "machine"},
-    A.Part{"checker", "N (spans, readings, stages, diagnostics)", A.Bend{}, "n", "machine"} ]
+    A.Part{"proc", "Run-a-program effect", A.C{}, "v", "machine"} ]
 
 def links() -> List<&2, A.Link>:
   [ A.Link{"cli", "bend", "compiles, proves, publishes", False{}},
@@ -43,10 +41,8 @@ def links() -> List<&2, A.Link>:
     A.Link{"cli", "tailscale", "tailscale-serve targets", False{}},
     A.Link{"cli", "proc", "runs programs", False{}},
     A.Link{"arc", "hub", "bend-hub target (V's own)", False{}},
-    A.Link{"checker", "bend", "checks", False{}},
-    A.Link{"checker", "v", "checks against V", False{}},
-    A.Link{"v", "github", "source", False{}},
-    A.Link{"n", "github", "source", False{}} ]
+    A.Link{"v", "github", "source", False{}} ]
+
 
 def system() -> A.System:
   A.System{org(), nodes(), near(), parts(), links()}
@@ -57,5 +53,4 @@ def targets() -> List<&2, D.Target>:
 
 def packages() -> List<&2, D.Package>:
   [ D.Package{"near-architecture", "0.9.1.0", "../arc/arc.bend", ["arc"]},
-    D.Package{"near-v-framework", "0.2.0.0", "../v.bend", ["cli", "lib", "proc"]},
-    D.Package{"near-n-checker", "0.1.0.0", "../n.bend", ["checker"]} ]
+    D.Package{"near-v-framework", "0.2.0.0", "../v.bend", ["cli", "lib", "proc"]} ]

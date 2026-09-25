@@ -25,7 +25,7 @@ law parts_published:
 law source_deployed:
   {D.source_deployed(V.system(), V.targets()) == True{} : Bool}
 
-# What N and V publish is open source, so the repository is public; `v system deploy` checks GitHub agrees.
+# What V publishes is open source, so the repository is public; `v system deploy` checks GitHub agrees.
 law open_source:
   {D.open_source(V.targets()) == True{} : Bool}
 

@@ -177,9 +177,22 @@ def all_in(xs: List<&2, String>, +ys: List<&2, String>) -> Bool:
     case x <> rest:
       listed(x, ys) && all_in(rest, ys)
 
-# One start, and everything reachable from it.
+# Links between programs: a link to or from a part counts for the program it belongs to.
+def program_links(ls: List<&2, A.Link>, +s: A.System) -> List<&2, A.Link>:
+  match ls:
+    case []:
+      []
+    case l <> rest:
+      match l:
+        case A.Link{a, b, label, live}:
+          A.Link{container_of(a, s), container_of(b, s), label, live} <> program_links(rest, s)
+
+def programs(+s: A.System) -> List<&2, String>:
+  container_keys(A.containers(s))
+
+# One start: exactly one program nothing links to, and every program reachable from it.
 def one_start(+s: A.System) -> Bool:
-  Nat.is_eq(List.length(&2, String, starts(items(s), edges(s))), 1n) && all_in(items(s), reach(List.length(&2, String, items(s)), 0n, starts(items(s), edges(s)), edges(s)))
+  Nat.is_eq(List.length(&2, String, starts(programs(s), program_links(A.links(s), s))), 1n) && all_in(programs(s), reach(List.length(&2, String, programs(s)), 0n, starts(programs(s), program_links(A.links(s), s)), program_links(A.links(s), s)))
 
 # ---- the tree it serializes to: the graph walked depth first from its start ----
 type Line is Data:
@@ -268,4 +281,122 @@ def render(ls: List<&2, Line>, +s: A.System) -> String:
           indent(d) ++ "- **" ++ name_of(k, s) ++ "**" ++ pick_s(String.is_empty(via), "", " (" ++ via ++ ")") ++ " · " ++ node_label(node_of(k, s), A.nodes(s)) ++ "\n" ++ render(rest, s)
 
 def markdown(+s: A.System, ok: {one_start(s) == True{} : Bool}) -> String:
-  render(walk(Nat.mul(1n+List.length(&2, String, items(s)), 1n+List.length(&2, A.Link, edges(s))), [Line{0n, head_or(starts(items(s), edges(s)), ""), ""}], [], edges(s)), s)
+  render(walk(Nat.mul(1n+List.length(&2, String, items(s)), 1n+List.length(&2, A.Link, edges(s))), [Line{0n, head_or(starts(programs(s), program_links(A.links(s), s)), ""), ""}], [], edges(s)), s)
+
+# ---- JSON serialization, for the interactive viewer ----
+def esc(s: String) -> String:
+  String.join(String.split(s, '"'), "\\\"")
+
+def jstr(s: String) -> String:
+  "\"" ++ esc(s) ++ "\""
+
+def jlist(xs: List<&2, String>) -> String:
+  "[" ++ String.join(xs, ",") ++ "]"
+
+def jstrs(xs: List<&2, String>) -> List<&2, String>:
+  match xs:
+    case []:
+      []
+    case x <> rest:
+      jstr(x) <> jstrs(rest)
+
+def role_name(r: A.NodeRole) -> String:
+  match r:
+    case A.UserDevice{}:
+      "user-device"
+    case A.Server{}:
+      "server"
+    case A.Overlay{}:
+      "overlay"
+    case A.Outside{}:
+      "outside"
+
+def host_name(h: A.Host) -> String:
+  match h:
+    case A.Owned{d}:
+      "owned:" ++ d
+    case A.Cloud{p}:
+      "cloud:" ++ p
+    case A.Other{}:
+      "other"
+
+def kind_name(k: A.ContainerKind) -> String:
+  match k:
+    case A.Client{}:
+      "client"
+    case A.DataApi{}:
+      "data-api"
+    case A.Harness{}:
+      "harness"
+    case A.Proxy{}:
+      "proxy"
+    case A.ModelApi{}:
+      "model-api"
+    case A.Cli{}:
+      "cli"
+    case A.Worker{}:
+      "worker"
+
+def owner_name(o: A.Owner) -> String:
+  match o:
+    case A.Ours{}:
+      "ours"
+    case A.Theirs{}:
+      "theirs"
+
+def lang_name(l: A.Lang) -> String:
+  match l:
+    case A.Bend{}:
+      "Bend"
+    case A.C{}:
+      "C"
+    case A.Rust{}:
+      "Rust"
+    case A.TypeScript{}:
+      "TypeScript"
+    case A.JavaScript{}:
+      "JavaScript"
+    case A.Python{}:
+      "Python"
+    case A.Opaque{}:
+      "opaque"
+
+def nodes_json(ns: List<&2, A.Node>) -> List<&2, String>:
+  match ns:
+    case []:
+      []
+    case n <> rest:
+      match n:
+        case A.Node{k, name, role, host}:
+          ("{\"key\":" ++ jstr(k) ++ ",\"name\":" ++ jstr(name) ++ ",\"role\":" ++ jstr(role_name(role)) ++ ",\"host\":" ++ jstr(host_name(host)) ++ "}") <> nodes_json(rest)
+
+def containers_json(cs: List<&2, A.Container>) -> List<&2, String>:
+  match cs:
+    case []:
+      []
+    case c <> rest:
+      match c:
+        case A.Container{k, name, kind, owner, on, _, _, _, vendors, frameworks, libraries, languages}:
+          ("{\"key\":" ++ jstr(k) ++ ",\"name\":" ++ jstr(name) ++ ",\"kind\":" ++ jstr(kind_name(kind)) ++ ",\"owner\":" ++ jstr(owner_name(owner)) ++ ",\"node\":" ++ jstr(on) ++ ",\"vendors\":" ++ jlist(jstrs(vendors)) ++ ",\"frameworks\":" ++ jlist(jstrs(frameworks)) ++ ",\"libraries\":" ++ jlist(jstrs(libraries)) ++ ",\"languages\":" ++ jlist(jstrs(languages)) ++ "}") <> containers_json(rest)
+
+def parts_json(ps: List<&2, A.Part>) -> List<&2, String>:
+  match ps:
+    case []:
+      []
+    case p <> rest:
+      match p:
+        case A.Part{k, name, lang, i, on}:
+          ("{\"key\":" ++ jstr(k) ++ ",\"name\":" ++ jstr(name) ++ ",\"lang\":" ++ jstr(lang_name(lang)) ++ ",\"container\":" ++ jstr(i) ++ ",\"node\":" ++ jstr(on) ++ "}") <> parts_json(rest)
+
+def links_json(ls: List<&2, A.Link>) -> List<&2, String>:
+  match ls:
+    case []:
+      []
+    case l <> rest:
+      match l:
+        case A.Link{a, b, label, _}:
+          ("{\"src\":" ++ jstr(a) ++ ",\"dst\":" ++ jstr(b) ++ ",\"label\":" ++ jstr(label) ++ "}") <> links_json(rest)
+
+# The graph as JSON, from its one start (the proof again rules out a system with several).
+def json(+s: A.System, ok: {one_start(s) == True{} : Bool}) -> String:
+  "{\"start\":" ++ jstr(head_or(starts(programs(s), program_links(A.links(s), s)), "")) ++ ",\"nodes\":" ++ jlist(nodes_json(A.nodes(s))) ++ ",\"containers\":" ++ jlist(containers_json(A.containers(s))) ++ ",\"parts\":" ++ jlist(parts_json(A.parts(s))) ++ ",\"links\":" ++ jlist(links_json(A.links(s))) ++ "}"

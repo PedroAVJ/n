@@ -1,17 +1,4 @@
-# N
-
-A static type checker for `.n` source, in [Bend 2](https://bend-lang.com).
-
-A `.n` file is source code in any code: English, Spanish, a diagram. N elaborates it into Bend
-terms, typed against V, the framework in this repository, and reports type errors. A span with
-more than one reading is a type error: the author picks the reading they meant, or N fixes it when
-context settles it. U, N's feelings stage, runs after N and owns only the rules about feelings.
-
-Near is the editor where `.n` files are written and their errors shown.
-
-`n.bend` holds N's vocabulary: spans, readings, stages and diagnostics. The checker is not written yet.
-
-## V
+# V
 
 Data structures for your Bend algorithms: a play on Niklaus Wirth's *Algorithms + Data Structures =
 Programs*. V as in Victor, after Victor Taelin, who created Bend, and the pronunciation of Bend.
@@ -23,7 +10,7 @@ A broken invariant is a compile error, never a runtime surprise.
 V is a framework, not a language: the language is [Bend 2](https://bend-lang.com).
 It builds on packages from the Bend hub, and nothing in it is specific to one project.
 
-### Arc
+## Arc
 
 `arc/arc.bend` is the architecture layer, published on its own. A system is two
 hierarchies over the same containers:
@@ -40,7 +27,7 @@ Keys work like foreign keys, and a project writes its laws with Arc's predicates
 well-formedness, private servers, devices reaching servers only through the private
 network, each capability provided exactly once, and a D2 diagram.
 
-### The rest of V
+## The rest of V
 
 - `lib/deploy.bend`: services, routes and launchd jobs for an Arc system; what a change
   breaks; minimality against the machine (launch agents, listeners); the deploy plan and
@@ -52,7 +39,7 @@ network, each capability provided exactly once, and a D2 diagram.
 
 Packages: `bend-net-json@0.3.0.0` (Tailscale's serve status), `bend-net-url@0.4.0.0` (URL decoding).
 
-### Targets
+## Targets
 
 A project declares where it deploys, and `v system deploy` runs only those targets:
 
@@ -64,13 +51,13 @@ A project declares where it deploys, and `v system deploy` runs only those targe
 - `BendHub{}`: publish the project's packages. A package already published with the same
   files is left alone; changed files without a new version fail the deploy.
 
-### This repository's architecture
+## This repository's architecture
 
-`arch/` is this repository as a V project: N, the `v` command, the tools it drives, GitHub and the
+`arch/` is this repository as a V project: the `v` command, the tools it drives, GitHub and the
 Bend hub. Its targets are `GitHub` and `BendHub`, so `cd arch && v system deploy` proves the laws,
 pushes the repository and publishes its packages.
 
-### A project
+## A project
 
 `v` runs in a project's folder. The project describes itself with Arc and V's library and
 provides small programs `v` compiles and runs: `facts.bend` (where V's library is, its

@@ -306,12 +306,24 @@ def prove() -> IO(Unit):
     +out : String <- P.check_bend("PROOF.bend")
     fail_or(String.contains(out, "All terms check."), out, IO.print("laws: all proven"))
 
+# Every architecture is one graph with one start (lib/text.bend). V writes that claim as graph.bend and
+# checks it for every project, before its own laws.
+def graph_text(+vlib: String) -> String:
+  "import Base\nimport " ++ vlib ++ "/text.bend as T\nimport ./canvas.bend as V\n\n# Written by `v system check`: this architecture is one graph with one start. Do not edit.\ndef one_start() -> {T.one_start(V.system()) == True{} : Bool}:\n  {==}\n"
+
+def one_graph(+f: P.Facts) -> IO(Unit):
+  do IO<Unit>:
+    X.write_file("graph.bend", graph_text(P.vlib_of(f)))
+    +out : String <- P.check_bend("graph.bend")
+    fail_or(String.contains(out, "All terms check."), "not one graph with one start:\n" ++ out, IO.print("graph: one start"))
+
 # The machine is snapshotted only for a project that configures it (a nix-darwin target).
 def check_with(+f: P.Facts) -> IO(Unit):
   do IO<Unit>:
     P.when(P.has_target(f, "nix-darwin"), snapshot(f))
     P.when(P.has_target(f, "azure"), Azure.snapshot(f))
     P.when(P.has_target(f, "bend-hub"), Src.write_sources(f))
+    one_graph(f)
     prove()
 
 def check() -> IO(Unit):

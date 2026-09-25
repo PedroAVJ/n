@@ -112,6 +112,13 @@ def items(+s: A.System) -> List<&2, String>:
 def edges(+s: A.System) -> List<&2, A.Link>:
   List.append(&2, A.Link, A.links(s), containment(A.parts(s)))
 
+def keep_new(known: Bool, x: String, rest: List<&2, String>) -> List<&2, String>:
+  match known:
+    case True{}:
+      rest
+    case False{}:
+      x <> rest
+
 def has_in(+k: String, es: List<&2, A.Link>) -> Bool:
   match es:
     case []:
@@ -127,7 +134,7 @@ def starts(ks: List<&2, String>, +es: List<&2, A.Link>) -> List<&2, String>:
     case []:
       []
     case +k <> +rest:
-      pick_l(has_in(k, es), starts(rest, es), k <> starts(rest, es))
+      keep_new(has_in(k, es), k, starts(rest, es))
 
 def outs(+k: String, es: List<&2, A.Link>) -> List<&2, String>:
   match es:
@@ -136,14 +143,7 @@ def outs(+k: String, es: List<&2, A.Link>) -> List<&2, String>:
     case e <> +rest:
       match e:
         case A.Link{a, b, _, _}:
-          pick_l(String.eq(a, k), b <> outs(k, rest), outs(k, rest))
-
-def keep_new(known: Bool, x: String, rest: List<&2, String>) -> List<&2, String>:
-  match known:
-    case True{}:
-      rest
-    case False{}:
-      x <> rest
+          keep_new(Bool.not(String.eq(a, k)), b, outs(k, rest))
 
 def fresh(xs: List<&2, String>, +seen: List<&2, String>, +acc: List<&2, String>) -> List<&2, String>:
   match xs:
@@ -192,6 +192,13 @@ def pick_lines(c: Bool, a: List<&2, Line>, b: List<&2, Line>) -> List<&2, Line>:
     case False{}:
       b
 
+def keep_line(c: Bool, x: Line, rest: List<&2, Line>) -> List<&2, Line>:
+  match c:
+    case True{}:
+      x <> rest
+    case False{}:
+      rest
+
 def child_lines(+d: Nat, +k: String, es: List<&2, A.Link>) -> List<&2, Line>:
   match es:
     case []:
@@ -199,7 +206,7 @@ def child_lines(+d: Nat, +k: String, es: List<&2, A.Link>) -> List<&2, Line>:
     case e <> +rest:
       match e:
         case A.Link{a, b, label, _}:
-          pick_lines(String.eq(a, k), Line{d, b, label} <> child_lines(d, k, rest), child_lines(d, k, rest))
+          keep_line(String.eq(a, k), Line{d, b, label}, child_lines(d, k, rest))
 
 def walk(+fuel: Nat, stack: List<&2, Line>, +seen: List<&2, String>, +es: List<&2, A.Link>) -> List<&2, Line>:
   match fuel:
@@ -212,7 +219,7 @@ def walk(+fuel: Nat, stack: List<&2, Line>, +seen: List<&2, String>, +es: List<&
         case top <> +rest:
           match top:
             case Line{+d, +k, +via}:
-              pick_lines(listed(k, seen), walk(f, rest, seen, es), Line{d, k, via} <> walk(f, List.append(&2, Line, child_lines(1n+d, k, es), rest), k <> seen, es))
+              keep_line(Bool.not(listed(k, seen)), Line{d, k, via}, walk(f, pick_lines(listed(k, seen), rest, List.append(&2, Line, child_lines(1n+d, k, es), rest)), pick_l(listed(k, seen), seen, k <> seen), es))
 
 # ---- serialization ----
 def host_emoji(h: A.Host) -> String:

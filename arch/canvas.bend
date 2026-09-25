@@ -44,6 +44,7 @@ def links() -> List<&2, A.Link>:
     A.Link{"cli", "proc", "runs programs", False{}},
     A.Link{"arc", "hub", "bend-hub target (V's own)", False{}},
     A.Link{"checker", "bend", "checks", False{}},
+    A.Link{"checker", "v", "checks against V", False{}},
     A.Link{"v", "github", "source", False{}},
     A.Link{"n", "github", "source", False{}} ]
 

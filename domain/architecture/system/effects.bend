@@ -81,11 +81,27 @@ def differing(fs: List<&2, String>, +local: String, +hub: String) -> IO(String):
 def hub_of(+published: String, +f: String) -> P.Hub:
   Bool.pick(P.Hub, String.is_empty(published), P.Unpublished{}, Bool.pick(P.Hub, String.is_empty(f), P.Same{}, P.Differs{f}))
 
+# The package's hash, as Bend's local cache names it. A package not cached yet is fetched first by
+# checking a file that imports it: the hub has it exactly when that succeeds.
+def fetch_if(missing: Bool, +home: String, +n: String, +v: String, +e: String, +cached: String) -> IO(String):
+  match missing:
+    case False{}:
+      IO.pure(String, cached)
+    case True{}:
+      do IO<String>:
+        X.write("/tmp/v-probe.bend", "import Base\nimport " ++ n ++ "@" ++ v ++ "/" ++ Fs.path.file_name(e) ++ " as P\n")
+        _ : Bool <- X.succeeds(home ++ "/.bend/bin/bend", ["/tmp/v-probe.bend", "--check-only"])
+        X.read(home ++ "/.bend/lib/names/" ++ n ++ "@" ++ v)
+
+def fetched(+home: String, +n: String, +v: String, +e: String, +cached: String) -> IO(String):
+  fetch_if(String.is_empty(String.trim(cached)), home, n, v, e, cached)
+
 def hub_state(+home: String, +root: String, p: Rl.Package) -> IO(P.Hub):
   match p:
-    case Rl.Package{n, v, +e, _}:
+    case Rl.Package{+n, +v, +e, _}:
       do IO<P.Hub>:
-        +hash : String <- X.read(home ++ "/.bend/lib/names/" ++ n ++ "@" ++ v)
+        cached : String <- X.read(home ++ "/.bend/lib/names/" ++ n ++ "@" ++ v)
+        +hash : String <- fetched(home, n, v, e, cached)
         +files : List<&2, String> <- reach(1000n, [e], [], root)
         f : String <- differing(files, root, home ++ "/.bend/lib/" ++ String.trim(hash))
         return hub_of(String.trim(hash), f)

@@ -119,15 +119,27 @@ def conversation(+path: String) -> IO(String):
 def key_option() -> String:
   "openrouter_api_key"
 
-# Codex has no plugin options yet, so under Codex the key is $OPENROUTER_API_KEY from Codex's environment.
+# The key, first found of: the plugin's option (Claude Code), $OPENROUTER_API_KEY, and the Keychain item
+# the hook's configuration names (none when it names none).
 def key_or(+option: String, +variable: String) -> String:
   Bool.pick(String, String.is_empty(String.trim(option)), String.trim(variable), String.trim(option))
 
-def key() -> IO(String):
+def keychain(missing: Bool, +found: String, +item: String) -> IO(String):
+  match missing:
+    case False{}:
+      IO.pure(String, found)
+    case True{}:
+      Bool.pick(IO(String), String.is_empty(item), IO.pure(String, ""),
+        do IO<String>:
+          k : String <- run("security", ["find-generic-password", "-s", item, "-w"], "", 5000)
+          return String.trim(k))
+
+def key(+item: String) -> IO(String):
   do IO<String>:
     k : String <- env("CLAUDE_PLUGIN_OPTION_OPENROUTER_API_KEY")
     v : String <- env("OPENROUTER_API_KEY")
-    return key_or(k, v)
+    +found : String = key_or(k, v)
+    keychain(String.is_empty(found), found, item)
 
 # ---- asking Jev ----
 def esc.go(cs: List<&2, Char>) -> List<&2, Char>:

@@ -12,8 +12,9 @@ import ../domain/architecture/system/release/plugin/codex/type.bend as Cx
 # (Near's check) screens each phrase, and Claude runs N4's type error and lint check on what Jev flags,
 # giving each finding its one reading or its candidate readings. The agent settles those first. A
 # prompt with nothing to settle passes silently, and so does any failure.
-#   n hook               the UserPromptSubmit hook: the hook's JSON on stdin, its answer on stdout
-#   n dryrun             the same input: what the hook would send to Jev, without sending it
+#   n hook [item]        the UserPromptSubmit hook: the hook's JSON on stdin, its answer on stdout; the
+#                        OpenRouter key from the plugin's option, $OPENROUTER_API_KEY, or Keychain item
+#   n dryrun [item]      the same input: what the hook would send to Jev, without sending it
 #   n plugin <dir>       build the Claude Code plugin into <dir>, run from the repository's root
 #   bend n/n.bend -o n   build n
 
@@ -74,13 +75,13 @@ def by_jev(no_key: Bool, +k: String, +conversation: String, +prompt: String, +ps
         +response : String <- E.ask(url(u), k, Json.encode(C.request(model(), conversation, prompt, ps)))
         screened(response, conversation, prompt, ps)
 
-def checked(skip: Bool, +path: String, +prompt: String) -> IO(Unit):
+def checked(skip: Bool, +path: String, +prompt: String, +item: String) -> IO(Unit):
   match skip:
     case True{}:
       IO.pure(Unit, Unit{})
     case False{}:
       do IO<Unit>:
-        +k : String <- E.key()
+        +k : String <- E.key(item)
         +conversation : String <- E.conversation(path)
         by_jev(String.is_empty(k), k, conversation, prompt, C.phrases(prompt))
 
@@ -88,13 +89,13 @@ def checked(skip: Bool, +path: String, +prompt: String) -> IO(Unit):
 def skipped(+prompt: String, +inside: String) -> Bool:
   String.is_empty(String.trim(prompt)) || String.starts_with(String.trim(prompt), "/") || Bool.not(String.is_empty(inside))
 
-def hook() -> IO(Unit):
+def hook(+item: String) -> IO(Unit):
   do IO<Unit>:
     input : String <- E.stdin()
     inside : String <- E.env("N_HOOK")
     +v : Maybe<&2, Json.Val> = Json.parse(input)
     +prompt : String = C.text(C.at(v, "prompt"))
-    checked(skipped(prompt, inside), C.text(C.at(v, "transcript_path")), prompt)
+    checked(skipped(prompt, inside), C.text(C.at(v, "transcript_path")), prompt, item)
 
 # ---- the dry run ----
 def shown(ps: List<&2, C.Phrase>) -> String:
@@ -108,14 +109,14 @@ def key_source(+k: String) -> String:
   Bool.pick(String, String.is_empty(k), "missing (Claude Code: the plugin's " ++ E.key_option() ++ " option; Codex: $OPENROUTER_API_KEY), so Claude checks every whole prompt",
     "set")
 
-def dryrun() -> IO(Unit):
+def dryrun(+item: String) -> IO(Unit):
   do IO<Unit>:
     input : String <- E.stdin()
     +v : Maybe<&2, Json.Val> = Json.parse(input)
     +prompt : String = C.text(C.at(v, "prompt"))
     +ps : List<&2, C.Phrase> = C.phrases(prompt)
     +conversation : String <- E.conversation(C.text(C.at(v, "transcript_path")))
-    k : String <- E.key()
+    k : String <- E.key(item)
     u : String <- E.env("N_CHECK_URL")
     IO.print("N dry run")
     inside : String <- E.env("N_HOOK")
@@ -163,10 +164,10 @@ def plugin(+dir: String) -> IO(Unit):
 
 # ---- the command line ----
 def command(+c: String, +arg: String) -> IO(Unit):
-  Bool.pick(IO(Unit), String.eq(c, "dryrun"), dryrun(),
+  Bool.pick(IO(Unit), String.eq(c, "dryrun"), dryrun(arg),
     Bool.pick(IO(Unit), String.eq(c, "plugin") && Bool.not(String.is_empty(arg)), plugin(arg),
-      Bool.pick(IO(Unit), String.eq(c, "hook") || String.is_empty(c), hook(),
-        IO.print("usage: n hook | n dryrun | n plugin <dir>"))))
+      Bool.pick(IO(Unit), String.eq(c, "hook") || String.is_empty(c), hook(arg),
+        IO.print("usage: n hook [keychain item] | n dryrun [keychain item] | n plugin <dir>"))))
 
 def dispatch(xs: List<&1, String>) -> IO(Unit):
   match xs:

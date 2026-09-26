@@ -178,3 +178,9 @@ def write(path: String, text: String) -> IO(Unit):
   do IO<Unit>:
     r : Result<&1, &1, U32 & String, File> <- File.open(path, "w")
     write_opened(r, text)
+
+# ---- asking Claude: N4's checker, on the person's own Claude Code subscription ----
+# Hooks are off inside it, and N_HOOK marks it, so N never checks its own checker's prompt.
+def claude(+prompt: String) -> IO(String):
+  run("env", ["-u", "CLAUDECODE", "N_HOOK=1", "claude", "-p", "--output-format", "json", "--no-session-persistence",
+    "--permission-mode", "dontAsk", "--settings", "{\"disableAllHooks\":true}"], prompt, 90000)

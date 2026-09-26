@@ -4,9 +4,10 @@ import ./check.bend as C
 import ./effects.bend as E
 import ./type.bend as T
 
-# N: a type checker for prompts. As a Claude Code hook it reads each prompt before the agent does, asks
-# Jev which phrases have more than one reading given the conversation, and hands the agent those
-# phrases to settle first. A prompt with nothing to settle passes silently, and so does any failure.
+# N: a type checker for prompts. As a Claude Code hook it reads each prompt before the agent does: Jev
+# (Near's check) screens each phrase, and Claude runs N4's type error and lint check on what Jev flags,
+# giving each finding its one reading or its candidate readings. The agent settles those first. A
+# prompt with nothing to settle passes silently, and so does any failure.
 #   n hook               the UserPromptSubmit hook: the hook's JSON on stdin, its answer on stdout
 #   n dryrun             the same input: what the hook would send to Jev, without sending it
 #   n plugin <dir>       build the Claude Code plugin into <dir>, run from the repository's root
@@ -19,26 +20,55 @@ def version() -> String:
   "0.2.0"
 
 # ---- the hook ----
-def told(ms: List<&2, C.Mark>) -> IO(Unit):
+# Jev screens every phrase; Claude runs N4's checker on what Jev flagged and gives each finding its one
+# reading or its candidate readings. Without a key or an answer from Jev, Claude checks the whole
+# prompt; without an answer from Claude, Jev's marks are what the agent is told.
+def said(silent: Bool, +out: String) -> IO(Unit):
+  match silent:
+    case True{}:
+      IO.pure(Unit, Unit{})
+    case False{}:
+      IO.print(out)
+
+def found(+prompt: String, +fs: List<&2, C.Finding>) -> IO(Unit):
+  said(List.is_empty(&2, C.Finding, fs), C.hook_output(prompt, fs))
+
+def unchecked(+ms: List<&2, C.Mark>) -> IO(Unit):
+  said(List.is_empty(&2, C.Mark, ms), C.jev_output(ms))
+
+def claude_said(+out: String, +prompt: String, +ms: List<&2, C.Mark>) -> IO(Unit):
+  Bool.pick(IO(Unit), String.is_empty(out), unchecked(ms), found(prompt, C.findings(out, prompt)))
+
+def flagged(ms: List<&2, C.Mark>) -> List<&2, C.Phrase>:
   match ms:
     case []:
-      IO.pure(Unit, Unit{})
-    case m <> rest:
-      IO.print(C.hook_output(m <> rest))
+      []
+    case C.Mark{p, _} <> rest:
+      p <> flagged(rest)
+
+def by_claude(+conversation: String, +prompt: String, +ms: List<&2, C.Mark>) -> IO(Unit):
+  do IO<Unit>:
+    +out : String <- E.claude(C.checker_prompt(conversation, prompt, flagged(ms)))
+    claude_said(out, prompt, ms)
+
+# Jev answered: nothing flagged is a clean prompt. Jev did not answer: Claude checks everything.
+def screened(+response: String, +conversation: String, +prompt: String, +ps: List<&2, C.Phrase>) -> IO(Unit):
+  +ms = C.marks(response, ps)
+  Bool.pick(IO(Unit), String.is_empty(response), by_claude(conversation, prompt, []),
+    Bool.pick(IO(Unit), List.is_empty(&2, C.Mark, ms), IO.pure(Unit, Unit{}), by_claude(conversation, prompt, ms)))
 
 def url(+u: String) -> String:
   Bool.pick(String, String.is_empty(u), E.decisions_url(), u)
 
-def asked(missing: Bool, +k: String, +path: String, +prompt: String, +ps: List<&2, C.Phrase>) -> IO(Unit):
-  match missing:
+def by_jev(no_key: Bool, +k: String, +conversation: String, +prompt: String, +ps: List<&2, C.Phrase>) -> IO(Unit):
+  match no_key:
     case True{}:
-      IO.pure(Unit, Unit{})
+      by_claude(conversation, prompt, [])
     case False{}:
       do IO<Unit>:
-        conversation : String <- E.conversation(path)
         u : String <- E.env("N_CHECK_URL")
-        response : String <- E.ask(url(u), k, Json.encode(C.request(model(), conversation, prompt, ps)))
-        told(C.marks(response, ps))
+        +response : String <- E.ask(url(u), k, Json.encode(C.request(model(), conversation, prompt, ps)))
+        screened(response, conversation, prompt, ps)
 
 def checked(skip: Bool, +path: String, +prompt: String) -> IO(Unit):
   match skip:
@@ -47,18 +77,20 @@ def checked(skip: Bool, +path: String, +prompt: String) -> IO(Unit):
     case False{}:
       do IO<Unit>:
         +k : String <- E.key()
-        asked(String.is_empty(k), k, path, prompt, C.phrases(prompt))
+        +conversation : String <- E.conversation(path)
+        by_jev(String.is_empty(k), k, conversation, prompt, C.phrases(prompt))
 
-# Slash commands and empty prompts are not checked.
-def skipped(+prompt: String) -> Bool:
-  String.is_empty(String.trim(prompt)) || String.starts_with(String.trim(prompt), "/")
+# Slash commands, empty prompts and N's own checker are not checked.
+def skipped(+prompt: String, +inside: String) -> Bool:
+  String.is_empty(String.trim(prompt)) || String.starts_with(String.trim(prompt), "/") || Bool.not(String.is_empty(inside))
 
 def hook() -> IO(Unit):
   do IO<Unit>:
     input : String <- E.stdin()
+    inside : String <- E.env("N_HOOK")
     +v : Maybe<&2, Json.Val> = Json.parse(input)
     +prompt : String = C.text(C.at(v, "prompt"))
-    checked(skipped(prompt), C.text(C.at(v, "transcript_path")), prompt)
+    checked(skipped(prompt, inside), C.text(C.at(v, "transcript_path")), prompt)
 
 # ---- the dry run ----
 def shown(ps: List<&2, C.Phrase>) -> String:
@@ -84,12 +116,15 @@ def dryrun() -> IO(Unit):
     k : String <- E.key()
     u : String <- E.env("N_CHECK_URL")
     IO.print("N dry run")
-    IO.print("Skipped: " ++ Bool.show(skipped(prompt)))
+    inside : String <- E.env("N_HOOK")
+    IO.print("Skipped: " ++ Bool.show(skipped(prompt, inside)))
     IO.print("Phrases: " ++ Nat.show(List.length(&2, C.Phrase, ps)) ++ shown(ps))
     IO.print("Conversation: " ++ Nat.show(String.length(conversation)) ++ " characters")
     IO.print("Key: " ++ key_source(env, k))
     IO.print("Would POST to " ++ url(u) ++ ":")
     IO.print(Json.encode(C.request(model(), conversation, prompt, ps)))
+    IO.print("Then, for what Jev flags (or everything, without Jev), would ask Claude:")
+    IO.print(C.checker_prompt(conversation, prompt, []))
     IO.print("Nothing was sent.")
 
 # ---- the plugin ----
@@ -110,7 +145,7 @@ def hooks() -> String:
         ("hooks", Json.Arr{[C.obj([
           ("type", C.str("command")),
           ("command", C.str("\"${CLAUDE_PLUGIN_ROOT}/bin/n\" hook")),
-          ("timeout", Json.Num{"20"})])]})])]})]))]))
+          ("timeout", Json.Num{"120"})])]})])]})]))]))
 
 def built(ok: Bool, +dir: String) -> IO(Unit):
   match ok:

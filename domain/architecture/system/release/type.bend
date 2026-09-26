@@ -8,10 +8,11 @@ type Package is Data:
 type Repository is Data:
   Repository{name: String, public: Bool}
 
-# A Claude Code plugin: built by its entry's `plugin <dir>` command at its version (semver), and released
-# to its own GitHub repository, which is also the marketplace it installs from, tagged v<version>.
+# A Claude Code plugin: built by its entry's `plugin <dir>` command at its version (semver), shipping its
+# components, and released to its own GitHub repository, which is also the marketplace it installs from,
+# tagged v<version>.
 type Plugin is Data:
-  Plugin{name: String, version: String, entry: String, repository: Repository}
+  Plugin{name: String, version: String, entry: String, components: List<&2, String>, repository: Repository}
 
 # What the system publishes.
 type Release is Data:

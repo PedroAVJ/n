@@ -58,7 +58,7 @@ def package_steps(ps: List<&2, Rl.Package>, hs: List<&2, P.Hub>) -> List<&2, P.S
 # ---- each plugin: released as it builds, new, or changed without a new version ----
 def plugin_step(g: Rl.Plugin, t: P.Tag) -> P.Step:
   match g t:
-    case Rl.Plugin{+n, +v, _, Rl.Repository{+r, _}} P.Tag{repo, tagged, +built, differs}:
+    case Rl.Plugin{+n, +v, _, _, Rl.Repository{+r, _}} P.Tag{repo, tagged, +built, differs}:
       +what = "plugin " ++ n ++ "@" ++ v
       Bool.pick(P.Step, String.is_empty(built), P.Blocked{what, "does not build"},
         Bool.pick(P.Step, Bool.not(String.eq(built, v)), P.Blocked{what, "builds as version " ++ built},

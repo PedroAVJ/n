@@ -96,8 +96,8 @@ without deep recursion.
 
 ## N
 
-`n/` is N, a type checker for prompts, published as `near-n-checker` and released as the Claude Code
-plugin `n` (GitHub `PedroAVJ/n-plugin`). Before the agent reads a prompt, Jev screens each phrase, and
+`n/` is N, a type checker for prompts, released as the Claude Code plugin `n` (GitHub
+`PedroAVJ/n-plugin`), not yet as a Bend hub package. Before the agent reads a prompt, Jev screens each phrase, and
 Claude runs N's type error and lint check on what Jev flags: each finding gets its one reading or its
 candidate readings, in N's vocabulary (`n/type.bend`). A prompt with nothing to settle passes silently,
 and so does any failure.

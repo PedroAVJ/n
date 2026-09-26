@@ -185,7 +185,7 @@ def tag_differs(tagged: Bool, +root: String, +n: String, +v: String, +r: String)
 
 def tag_state(+home: String, +root: String, g: Rl.Plugin) -> IO(P.Tag):
   match g:
-    case Rl.Plugin{+n, +v, +e, Rl.Repository{+r, _}}:
+    case Rl.Plugin{+n, +v, +e, _, Rl.Repository{+r, _}}:
       do IO<P.Tag>:
         built : String <- build_plugin(root, home ++ "/.bend/bin/bend", n, v, e, r)
         +repo : Bool <- X.succeeds("gh", ["repo", "view", r, "--json", "name"])

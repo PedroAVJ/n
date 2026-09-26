@@ -85,8 +85,18 @@ def plugin_entries(gs: List<&2, Rl.Plugin>) -> List<&2, String>:
       []
     case g <> rest:
       match g:
-        case Rl.Plugin{_, _, e, _}:
+        case Rl.Plugin{_, _, e, _, _}:
           e <> plugin_entries(rest)
+
+# Every component any plugin ships.
+def plugin_components(gs: List<&2, Rl.Plugin>) -> List<&2, String>:
+  match gs:
+    case []:
+      []
+    case g <> rest:
+      match g:
+        case Rl.Plugin{_, _, _, cs, _}:
+          List.append(&2, String, cs, plugin_components(rest))
 
 # ---- the repository: Bend only, and no dead code ----
 # Bend, or a foreign effect in C or JavaScript (Bend's two lanes).

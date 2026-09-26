@@ -60,7 +60,7 @@ def name() -> String:
   "V"
 
 def image() -> A.Imagery:
-  A.Logo{"v-logo.svg"}
+  A.Plain{}
 
 # Images for machines, programs and parts that have one of their own.
 def pictures() -> List<&2, A.Picture>:

@@ -74,4 +74,4 @@ def kind() -> A.SystemKind:
 
 # Who uses it: each "uses" edge names a party and the channel it comes through ("" when direct).
 def uses() -> List<&2, A.Use>:
-  [A.Use{A.Organization{"Builders", A.Emoji{"🧑🏽‍💻"}, A.Community{}}, "the Bend hub"}]
+  [A.Use{A.Organization{"Builders", A.Emoji{"🧑🏻‍💻"}, A.Community{}}, "the Bend hub"}]

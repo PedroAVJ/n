@@ -15,8 +15,11 @@ def repo_steps(+fs: List<&2, String>, +reached: List<&2, String>) -> List<&2, P.
   List.append(&2, P.Step,
     Bool.pick(List<&2, P.Step>, String.is_empty(RlO.not_bend(fs)), [],
       [P.Blocked{"repository", RlO.not_bend(fs) ++ " is not Bend"}]),
-    Bool.pick(List<&2, P.Step>, String.is_empty(RlO.dead(fs, reached)), [],
-      [P.Blocked{"repository", RlO.dead(fs, reached) ++ " is dead code: no entry reaches it"}]))
+    List.append(&2, P.Step,
+      Bool.pick(List<&2, P.Step>, String.is_empty(RlO.dead(fs, reached)), [],
+        [P.Blocked{"repository", RlO.dead(fs, reached) ++ " is dead code: no entry reaches it"}]),
+      Bool.pick(List<&2, P.Step>, String.is_empty(RlO.hub_refused(reached)), [],
+        [P.Blocked{"repository", RlO.hub_refused(reached) ++ ": the Bend hub refuses this path (segments of letters, digits and _)"}])))
 
 def remote_step(+repo: Rl.Repository, rm: P.Remote) -> P.Step:
   match repo rm:

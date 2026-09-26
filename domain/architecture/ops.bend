@@ -19,9 +19,9 @@ import ./environment/inventory/type.bend as I
 import ./environment/inventory/ops.bend as InvO
 import ./environment/agreement/type.bend as G
 import ./system/deployment/host/type.bend as H
-import ./system/deployment/nix-darwin/ops.bend as NDO
-import ./system/deployment/nix-darwin/type.bend as ND
-import ./system/deployment/nix-darwin/setting/ops.bend as StO
+import ./system/deployment/nix_darwin/ops.bend as NDO
+import ./system/deployment/nix_darwin/type.bend as ND
+import ./system/deployment/nix_darwin/setting/ops.bend as StO
 import ./type.bend as A
 
 # ---- the architecture as a compound graph: the system's tree, the environment's leaves, and every

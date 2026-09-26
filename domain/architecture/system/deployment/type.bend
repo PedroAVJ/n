@@ -1,6 +1,6 @@
 import Base
 import ./host/type.bend as H
-import ./nix-darwin/type.bend as ND
+import ./nix_darwin/type.bend as ND
 import ./azure/type.bend as Az
 
 # A device is someone's own (a phone, a laptop); a server runs the system for others.

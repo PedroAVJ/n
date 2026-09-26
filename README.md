@@ -29,7 +29,7 @@ domain/
    │  │  └─ component/
    │  ├─ deployment/     the address, the data stores that must survive, and the machines
    │  │  ├─ host/        an owned device, a provider's cloud, or someone else's
-   │  │  ├─ nix-darwin/  a Mac: its flake, services, Tailscale serves, listeners and launch agents
+   │  │  ├─ nix_darwin/  a Mac: its flake, services, Tailscale serves, listeners and launch agents
    │  │  │  ├─ service/
    │  │  │  ├─ setting/  macOS settings and the firewall (mac.nix)
    │  │  │  └─ brew/     Homebrew

@@ -115,3 +115,42 @@ def not_bend(fs: List<&2, String>) -> String:
       ""
     case +f <> rest:
       Bool.pick(String, allowed(f), not_bend(rest), f)
+
+# ---- the hub's path rule: every segment is [A-Za-z_][A-Za-z0-9_]* (the file name also ends in .bend, .c or
+# .js, or is a LICENSE), under 256 characters ----
+def name_char(+c: Char, first: Bool) -> Bool:
+  Char.is_lower(c) || Char.is_upper(c) || Char.is_eq(c, '_') || (Bool.not(first) && Char.is_digit(c))
+
+def name_chars_ok(cs: List<&2, Char>, first: Bool) -> Bool:
+  match cs:
+    case []:
+      Bool.not(first)
+    case +c <> rest:
+      name_char(c, first) && name_chars_ok(rest, False{})
+
+def stem(+f: String) -> String:
+  Bool.pick(String, String.ends_with(f, ".bend"), String.take(f, Nat.sub(String.length(f), 5n)),
+    Bool.pick(String, String.ends_with(f, ".js"), String.take(f, Nat.sub(String.length(f), 3n)),
+      Bool.pick(String, String.ends_with(f, ".c"), String.take(f, Nat.sub(String.length(f), 2n)), f)))
+
+def segments_ok(ss: List<&2, String>) -> Bool:
+  match ss:
+    case []:
+      True{}
+    case +s <> rest:
+      match rest:
+        case []:
+          String.eq(s, "LICENSE") || (is_source(s) && name_chars_ok(String.to_list(stem(s)), True{}))
+        case _ <> _:
+          name_chars_ok(String.to_list(s), True{}) && segments_ok(rest)
+
+def hub_path_ok(+f: String) -> Bool:
+  Nat.is_lt(String.length(f), 256n) && segments_ok(String.split(f, '/'))
+
+# The first file the hub would refuse, "" when there is none.
+def hub_refused(fs: List<&2, String>) -> String:
+  match fs:
+    case []:
+      ""
+    case +f <> rest:
+      Bool.pick(String, hub_path_ok(f), hub_refused(rest), f)

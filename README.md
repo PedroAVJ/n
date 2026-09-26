@@ -82,7 +82,8 @@ bend system.bend --check-only
 ```
 
 This repository is one: `architecture.bend` is V's own architecture. A plan covers the release (the
-package, the repository), each container's technology against the repository, each deployment node
+packages; each Claude Code plugin, built fresh and compared with the tag `v<version>` in its own GitHub
+repository, which is also the marketplace it installs from; the repository), each container's technology against the repository, each deployment node
 (a nix-darwin Mac: its settings, Homebrew, services, serves, listeners and launch agents; an Azure
 subscription: its resources and who may access them), and what the deploy would break compared with
 the last deploy (recorded in `.git/v-deployed`). It stops first on a file that is not Bend, dead code,
@@ -92,6 +93,19 @@ any runtime check that fails.
 Bend's JavaScript lane (`bend file.bend`) overflows on deep recursion (see Bend's WONTFIX), so V reads
 only the heads of files where that is all it needs, compares files with `cmp`, and splits long outputs
 without deep recursion.
+
+## N
+
+`n/` is N, a type checker for prompts, published as `near-n-checker` and released as the Claude Code
+plugin `n` (GitHub `PedroAVJ/n-plugin`). Before the agent reads a prompt, Jev screens each phrase, and
+Claude runs N's type error and lint check on what Jev flags: each finding gets its one reading or its
+candidate readings, in N's vocabulary (`n/type.bend`). A prompt with nothing to settle passes silently,
+and so does any failure.
+
+```sh
+bend n/n.bend dryrun < hook-input.json   # what the hook would send, without sending it
+bend n/n.bend plugin out                 # build the plugin into out/
+```
 
 ## License
 

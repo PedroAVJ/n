@@ -55,11 +55,35 @@ def package_steps(ps: List<&2, Rl.Package>, hs: List<&2, P.Hub>) -> List<&2, P.S
         case h <> hrest:
           package_step(p, h) <> package_steps(prest, hrest)
 
+# ---- each plugin: released as it builds, new, or changed without a new version ----
+def plugin_step(g: Rl.Plugin, t: P.Tag) -> P.Step:
+  match g t:
+    case Rl.Plugin{+n, +v, _, Rl.Repository{+r, _}} P.Tag{repo, tagged, +built, differs}:
+      +what = "plugin " ++ n ++ "@" ++ v
+      Bool.pick(P.Step, String.is_empty(built), P.Blocked{what, "does not build"},
+        Bool.pick(P.Step, Bool.not(String.eq(built, v)), P.Blocked{what, "builds as version " ++ built},
+          Bool.pick(P.Step, Bool.not(repo), P.ReleasePlugin{n, v, r, True{}},
+            Bool.pick(P.Step, Bool.not(tagged), P.ReleasePlugin{n, v, r, False{}},
+              Bool.pick(P.Step, differs, P.Blocked{what, "changed since v" ++ v ++ " was released; give it a new version"},
+                P.Current{what})))))
+
+def plugin_steps(gs: List<&2, Rl.Plugin>, ts: List<&2, P.Tag>) -> List<&2, P.Step>:
+  match gs:
+    case []:
+      []
+    case g <> grest:
+      match ts:
+        case []:
+          []
+        case t <> trest:
+          plugin_step(g, t) <> plugin_steps(grest, trest)
+
 # The plan: what a deploy would do, from the release and what was observed.
 def plan(r: Rl.Release, o: P.Observed) -> List<&2, P.Step>:
   match r o:
-    case Rl.Release{repo, ps} P.Observed{+fs, +reached, hs, rm}:
-      List.append(&2, P.Step, repo_steps(fs, reached), List.append(&2, P.Step, package_steps(ps, hs), [remote_step(repo, rm)]))
+    case Rl.Release{repo, ps, gs} P.Observed{+fs, +reached, hs, rm, ts}:
+      List.append(&2, P.Step, repo_steps(fs, reached), List.append(&2, P.Step, package_steps(ps, hs),
+        List.append(&2, P.Step, plugin_steps(gs, ts), [remote_step(repo, rm)])))
 
 def blocked(s: P.Step) -> Bool:
   match s:
@@ -83,6 +107,8 @@ def show(s: P.Step) -> String:
       "publish  " ++ n ++ "@" ++ v
     case P.Push{r}:
       "push     github " ++ r
+    case P.ReleasePlugin{n, +v, r, create}:
+      "release  plugin " ++ n ++ "@" ++ v ++ " to github " ++ r ++ " as tag v" ++ v ++ Bool.pick(String, create, " (a new repository)", "")
     case P.Rebuild{h, _, _}:
       "rebuild  nix-darwin " ++ h
     case P.ServePort{p, t, _}:

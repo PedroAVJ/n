@@ -38,17 +38,22 @@ def packages_ok(ps: List<&2, Rl.Package>) -> Bool:
 
 def packages(r: Rl.Release) -> List<&2, Rl.Package>:
   match r:
-    case Rl.Release{_, ps}:
+    case Rl.Release{_, ps, _}:
       ps
+
+def plugins(r: Rl.Release) -> List<&2, Rl.Plugin>:
+  match r:
+    case Rl.Release{_, _, gs}:
+      gs
 
 def repository(r: Rl.Release) -> Rl.Repository:
   match r:
-    case Rl.Release{repo, _}:
+    case Rl.Release{repo, _, _}:
       repo
 
 def is_public(r: Rl.Release) -> Bool:
   match r:
-    case Rl.Release{repo, _}:
+    case Rl.Release{repo, _, _}:
       match repo:
         case Rl.Repository{_, p}:
           p
@@ -72,6 +77,16 @@ def entries(ps: List<&2, Rl.Package>) -> List<&2, String>:
       match p:
         case Rl.Package{_, _, e, _}:
           e <> entries(rest)
+
+# Every plugin's entry file.
+def plugin_entries(gs: List<&2, Rl.Plugin>) -> List<&2, String>:
+  match gs:
+    case []:
+      []
+    case g <> rest:
+      match g:
+        case Rl.Plugin{_, _, e, _}:
+          e <> plugin_entries(rest)
 
 # ---- the repository: Bend only, and no dead code ----
 # Bend, or a foreign effect in C or JavaScript (Bend's two lanes).

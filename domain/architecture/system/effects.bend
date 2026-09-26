@@ -1,5 +1,6 @@
 import Base
 import bend-kit-files@0.1.0.0/files.bend as Fs
+import bend-net-json@0.3.0.0/json.bend as Json
 import ./effs/io.bend as X
 import ../type.bend as A
 import ../ops.bend as O
@@ -134,6 +135,75 @@ def remote(+root: String, r: Rl.Repository) -> IO(P.Remote):
         up : Bool <- pushed(root, first_word(head))
         return P.Remote{String.trim(origin), String.to_lower(String.trim(vis)), String.is_empty(String.trim(status)), up}
 
+# ---- a plugin: a fresh build of it, next to what GitHub has tagged for its version ----
+# Built under .git/v-plugin/<name>, never committed: build/ is what a release would hold, tag/ what
+# GitHub holds for the version.
+def plugin_dir(+root: String, +n: String) -> String:
+  root ++ "/.git/v-plugin/" ++ n
+
+def owner_of(+r: String) -> String:
+  Maybe.default(&2, String, List.head(&2, String, String.split(r, '/')), "")
+
+# The plugin's repository is also its marketplace: one plugin, at its root.
+def marketplace(+n: String, +v: String, +r: String) -> String:
+  "{\"name\":\"" ++ n ++ "\",\"owner\":{\"name\":\"" ++ owner_of(r) ++ "\"},\"plugins\":[{\"name\":\"" ++ n ++
+  "\",\"source\":\"./\",\"version\":\"" ++ v ++ "\"}]}\n"
+
+def str_of(m: Maybe<&2, Json.Val>) -> String:
+  match m:
+    case Some{Json.Str{s}}:
+      s
+    case _:
+      ""
+
+def version_in(m: Maybe<&2, Json.Val>) -> String:
+  match m:
+    case Some{v}:
+      str_of(Json.get(v, "version"))
+    case None{}:
+      ""
+
+def build_plugin(+root: String, +bend: String, +n: String, +v: String, +e: String, +r: String) -> IO(String):
+  do IO<String>:
+    +build : String = plugin_dir(root, n) ++ "/build"
+    _ : Bool <- X.succeeds("rm", ["-rf", plugin_dir(root, n)])
+    _ : Bool <- X.succeeds("mkdir", ["-p", build ++ "/.claude-plugin"])
+    ok : Bool <- X.succeeds(bend, [root ++ "/" ++ e, "plugin", build])
+    X.write(build ++ "/.claude-plugin/marketplace.json", marketplace(n, v, r))
+    manifest : String <- X.read(build ++ "/.claude-plugin/plugin.json")
+    return Bool.pick(String, ok, version_in(Json.parse(manifest)), "")
+
+def tag_differs(tagged: Bool, +root: String, +n: String, +v: String, +r: String) -> IO(Bool):
+  match tagged:
+    case False{}:
+      IO.pure(Bool, False{})
+    case True{}:
+      do IO<Bool>:
+        _ : Bool <- X.succeeds("git", ["clone", "-q", "--depth", "1", "--branch", "v" ++ v, "https://github.com/" ++ r, plugin_dir(root, n) ++ "/tag"])
+        same : Bool <- X.succeeds("diff", ["-rq", "-x", ".git", plugin_dir(root, n) ++ "/build", plugin_dir(root, n) ++ "/tag"])
+        return Bool.not(same)
+
+def tag_state(+home: String, +root: String, g: Rl.Plugin) -> IO(P.Tag):
+  match g:
+    case Rl.Plugin{+n, +v, +e, Rl.Repository{+r, _}}:
+      do IO<P.Tag>:
+        built : String <- build_plugin(root, home ++ "/.bend/bin/bend", n, v, e, r)
+        +repo : Bool <- X.succeeds("gh", ["repo", "view", r, "--json", "name"])
+        tags : String <- X.run("git", ["ls-remote", "--tags", "https://github.com/" ++ r, "refs/tags/v" ++ v])
+        +tagged : Bool = repo && Bool.not(String.is_empty(String.trim(tags)))
+        differs : Bool <- tag_differs(tagged, root, n, v, r)
+        return P.Tag{repo, tagged, built, differs}
+
+def tag_states(+home: String, +root: String, gs: List<&2, Rl.Plugin>) -> IO(List<&2, P.Tag>):
+  match gs:
+    case []:
+      IO.pure(List<&2, P.Tag>, [])
+    case g <> rest:
+      do IO<List<&2, P.Tag>>:
+        t : P.Tag <- tag_state(home, root, g)
+        ts : List<&2, P.Tag> <- tag_states(home, root, rest)
+        return t <> ts
+
 # ---- a snapshot: everything a plan needs ----
 def root() -> IO(String):
   do IO<String>:
@@ -143,14 +213,15 @@ def root() -> IO(String):
 # The files, what the packages' entries and the system's own entry reach, the hub, and GitHub.
 def observe(+root: String, +entry: String, r: Rl.Release) -> IO(P.Observed):
   match r:
-    case Rl.Release{repo, +ps}:
+    case Rl.Release{repo, +ps, +gs}:
       do IO<P.Observed>:
         +h : String <- X.home()
         +fs : List<&2, String> <- files(root)
-        reached : List<&2, String> <- reach(Nat.mul(1n+List.length(&2, String, fs), 1n+List.length(&2, String, fs)), entry <> RlO.entries(ps), [], root)
+        reached : List<&2, String> <- reach(Nat.mul(1n+List.length(&2, String, fs), 1n+List.length(&2, String, fs)), entry <> List.append(&2, String, RlO.entries(ps), RlO.plugin_entries(gs)), [], root)
         hs : List<&2, P.Hub> <- hub_states(h, root, ps)
         rm : P.Remote <- remote(root, repo)
-        return P.Observed{fs, reached, hs, rm}
+        ts : List<&2, P.Tag> <- tag_states(h, root, gs)
+        return P.Observed{fs, reached, hs, rm, ts}
 
 # ---- a deploy: carry out a plan with nothing blocked ----
 def apply(+root: String, +bend: String, s: P.Step) -> IO(Unit):
@@ -165,6 +236,17 @@ def apply(+root: String, +bend: String, s: P.Step) -> IO(Unit):
       do IO<Unit>:
         ok : Bool <- X.succeeds("git", ["-C", root, "push", "-q", "origin", "HEAD:main"])
         IO.print(Bool.pick(String, ok, "pushed   github " ++ r, "failed   push github " ++ r))
+    case P.ReleasePlugin{+n, +v, +r, create}:
+      do IO<Unit>:
+        +repo : String = plugin_dir(root, n) ++ "/repo"
+        _ : Bool <- Bool.pick(IO(Bool), create, X.succeeds("gh", ["repo", "create", r, "--public", "--description", "The " ++ n ++ " Claude Code plugin, built and released by V."]), IO.pure(Bool, True{}))
+        _ : Bool <- X.succeeds("git", ["clone", "-q", "https://github.com/" ++ r, repo])
+        _ : Bool <- X.succeeds("rsync", ["-a", "--delete", "--exclude", ".git", plugin_dir(root, n) ++ "/build/", repo ++ "/"])
+        _ : Bool <- X.succeeds("git", ["-C", repo, "add", "-A"])
+        _ : Bool <- X.succeeds("git", ["-C", repo, "commit", "-q", "-m", n ++ " " ++ v])
+        _ : Bool <- X.succeeds("git", ["-C", repo, "tag", "v" ++ v])
+        ok : Bool <- X.succeeds("git", ["-C", repo, "push", "-q", "origin", "HEAD:main", "v" ++ v])
+        IO.print(Bool.pick(String, ok, "released plugin " ++ n ++ "@" ++ v, "failed   release plugin " ++ n ++ "@" ++ v))
     case P.Rebuild{+h, +fl, +mac}:
       do IO<Unit>:
         _ : Result<&1, &1, U32 & String, Unit> <- Fs.mkdir(root ++ "/nix")

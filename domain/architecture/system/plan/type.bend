@@ -10,11 +10,17 @@ type Hub is Data:
 type Remote is Data:
   Remote{origin: String, visibility: String, clean: Bool, pushed: Bool}
 
+# What GitHub has for one declared plugin, next to a fresh build of it: whether its repository exists,
+# whether it is tagged v<version>, the version the build declares ("" when it did not build), and
+# whether the build differs from what the tag holds.
+type Tag is Data:
+  Tag{repository: Bool, tagged: Bool, built: String, differs: Bool}
+
 # What the world looks like now, as far as a release is concerned.
 type Observed is Data:
-  Observed{files: List<&2, String>, reached: List<&2, String>, hubs: List<&2, Hub>, remote: Remote}
+  Observed{files: List<&2, String>, reached: List<&2, String>, hubs: List<&2, Hub>, remote: Remote, tags: List<&2, Tag>}
 
-# One step of a plan. Publish, Push, Rebuild and ServePort change the world; Current and Change do not
+# One step of a plan. Publish, Push, ReleasePlugin, Rebuild and ServePort change the world; Current and Change do not
 # (a Change is what a Rebuild would change, shown by a dry run); Blocked stops the deploy.
 # Rebuild: write a nix-darwin node's flake and darwin-rebuild switch it. ServePort: serve a tailnet
 # HTTPS port from a local target, with the given Tailscale command.
@@ -22,6 +28,7 @@ type Step is Data:
   Current{what: String}
   Publish{name: String, version: String, entry: String}
   Push{repository: String}
+  ReleasePlugin{name: String, version: String, repository: String, create: Bool}
   Rebuild{host: String, flake: String, mac: String}
   ServePort{https: U32, target: String, tailscale: String}
   Change{what: String, now: String, want: String}

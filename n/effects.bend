@@ -51,8 +51,10 @@ def env(name: String) -> IO(String):
     return Result.default(&1, &1, U32 & String, String, r, "")
 
 # ---- the conversation so far, from the transcript Claude Code keeps ----
+# A text block: Claude Code's "text", Codex's "input_text" and "output_text".
 def part(+v: Json.Val) -> String:
-  Bool.pick(String, String.eq(C.text(Json.get(v, "type")), "text"), C.text(Json.get(v, "text")), "")
+  +t = C.text(Json.get(v, "type"))
+  Bool.pick(String, String.eq(t, "text") || String.eq(t, "input_text") || String.eq(t, "output_text"), C.text(Json.get(v, "text")), "")
 
 def parts(vs: List<&2, Json.Val>) -> String:
   match vs:
@@ -72,13 +74,21 @@ def content(m: Maybe<&2, Json.Val>) -> String:
     case _:
       ""
 
+# What the user or the assistant said. Context the agent injects as the user's (Codex's environment and
+# instructions, in tags) is not what the user said.
 def said(+role: String, +t: String) -> String:
-  Bool.pick(String, (String.eq(role, "user") || String.eq(role, "assistant")) && Bool.not(String.is_empty(String.trim(t))),
+  Bool.pick(String, (String.eq(role, "user") || String.eq(role, "assistant")) && Bool.not(String.is_empty(String.trim(t))) &&
+    Bool.not(String.starts_with(String.trim(t), "<")) && Bool.not(String.starts_with(String.trim(t), "# AGENTS.md")),
     role ++ ": " ++ String.take(String.trim(t), 1500n), "")
 
+# A transcript line: Claude Code's {type, message{content}}, or Codex's {type: "response_item",
+# payload{type: "message", role, content}}.
 def entry(+line: String) -> String:
   +v = Json.parse(line)
-  said(C.text(C.at(v, "type")), content(C.at(C.at(v, "message"), "content")))
+  +payload = C.at(v, "payload")
+  Bool.pick(String, String.eq(C.text(C.at(v, "type")), "response_item"),
+    said(C.text(C.at(payload, "role")), content(C.at(payload, "content"))),
+    said(C.text(C.at(v, "type")), content(C.at(C.at(v, "message"), "content"))))
 
 def entries(ls: List<&2, String>) -> List<&2, String>:
   match ls:
@@ -109,10 +119,15 @@ def conversation(+path: String) -> IO(String):
 def key_option() -> String:
   "openrouter_api_key"
 
+# Codex has no plugin options yet, so under Codex the key is $OPENROUTER_API_KEY from Codex's environment.
+def key_or(+option: String, +variable: String) -> String:
+  Bool.pick(String, String.is_empty(String.trim(option)), String.trim(variable), String.trim(option))
+
 def key() -> IO(String):
   do IO<String>:
     k : String <- env("CLAUDE_PLUGIN_OPTION_OPENROUTER_API_KEY")
-    return String.trim(k)
+    v : String <- env("OPENROUTER_API_KEY")
+    return key_or(k, v)
 
 # ---- asking Jev ----
 def esc.go(cs: List<&2, Char>) -> List<&2, Char>:

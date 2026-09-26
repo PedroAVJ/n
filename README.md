@@ -82,9 +82,9 @@ bend system.bend --check-only
 ```
 
 This repository is one: `architecture.bend` is V's own architecture. A plan covers the release (the
-packages; each Claude Code plugin, built fresh from its typed manifest
-(`release/plugin/`, after Claude Code's plugin schema), checked by `claude plugin validate --strict`, and
-compared with the tag `<name>-v<version>` in the marketplace it releases into, a GitHub repository holding each plugin under `plugins/<name>`; the
+packages; each plugin for Claude Code and Codex, built fresh from its typed manifests (`release/plugin/`:
+an Agent Plugins 1.0 core with Claude Code's and Codex's parts), checked by `claude plugin validate
+--strict`, and compared with the tag `<name>-v<version>` in the marketplace it releases into, a GitHub repository holding each plugin under `plugins/<name>`; the
 repository), each container's technology against the repository, each deployment node
 (a nix-darwin Mac: its settings, Homebrew, services, serves, listeners and launch agents; an Azure
 subscription: its resources and who may access them), and what the deploy would break compared with
@@ -98,7 +98,7 @@ without deep recursion.
 
 ## N
 
-`n/` is N, a type checker for prompts, released as the Claude Code plugin `n` in the
+`n/` is N, a type checker for prompts, released as the plugin `n` for Claude Code and Codex in the
 marketplace `near-plugins` (GitHub `PedroAVJ/near-plugins`), not yet as a Bend hub package. Before the agent reads a prompt, Jev screens each phrase, and
 Claude runs N's type error and lint check on what Jev flags: each finding gets its one reading or its
 candidate readings, in N's vocabulary (`n/type.bend`). A prompt with nothing to settle passes silently,

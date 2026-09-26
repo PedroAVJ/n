@@ -5,6 +5,8 @@ import ./effects.bend as E
 import ./type.bend as T
 import ../domain/architecture/system/release/plugin/type.bend as Pl
 import ../domain/architecture/system/release/plugin/ops.bend as PlO
+import ../domain/architecture/system/release/plugin/claude/type.bend as Cl
+import ../domain/architecture/system/release/plugin/codex/type.bend as Cx
 
 # N: a type checker for prompts. As a Claude Code hook it reads each prompt before the agent does: Jev
 # (Near's check) screens each phrase, and Claude runs N4's type error and lint check on what Jev flags,
@@ -103,8 +105,8 @@ def shown(ps: List<&2, C.Phrase>) -> String:
       "\n  [" ++ Nat.show(start) ++ ", " ++ Nat.show(end) ++ ") \"" ++ t ++ "\"" ++ shown(rest)
 
 def key_source(+k: String) -> String:
-  Bool.pick(String, String.is_empty(k), "missing: the plugin's " ++ E.key_option() ++ " option is not set, so Claude checks every whole prompt",
-    "set by the plugin's " ++ E.key_option() ++ " option")
+  Bool.pick(String, String.is_empty(k), "missing (Claude Code: the plugin's " ++ E.key_option() ++ " option; Codex: $OPENROUTER_API_KEY), so Claude checks every whole prompt",
+    "set")
 
 def dryrun() -> IO(Unit):
   do IO<Unit>:
@@ -128,15 +130,20 @@ def dryrun() -> IO(Unit):
     IO.print("Nothing was sent.")
 
 # ---- the plugin ----
-def manifest() -> Pl.Manifest:
-  Pl.Manifest{"n", None{}, version(),
-    "N checks each prompt for phrases with more than one reading, and has Claude settle them before it acts.",
-    Pl.Author{"Pedro Antonio Villanueva Juarez", None{}, Some{"https://github.com/PedroAVJ"}},
-    None{}, Some{"https://github.com/PedroAVJ/n"}, Some{"MIT"}, ["type checker", "prompts", "ambiguity"], True{},
-    [Pl.Field{E.key_option(), "OpenRouter API key", "The key N uses to ask Jev, through OpenRouter, which phrases of a prompt are unclear.", True{},
-      Pl.Text{True{}, None{}}}],
-    [Pl.Hook{Pl.UserPromptSubmit{}, [Pl.Group{None{}, [
-      Pl.Command{Pl.Exec{"${CLAUDE_PLUGIN_ROOT}/bin/n", ["hook"]}, Pl.Blocking{}, None{}, Some{120n}, Some{"N is checking the prompt"}}]}]}]}
+# N for Claude Code and Codex, from one folder: both run the same bin/n on each prompt.
+def package() -> Pl.Package:
+  Pl.Package{
+    Pl.Core{"n", version(),
+      "N checks each prompt for phrases with more than one reading, and has the agent settle them before it acts.",
+      Pl.Author{"Pedro Antonio Villanueva Juarez", None{}, Some{"https://github.com/PedroAVJ"}},
+      None{}, Some{"https://github.com/PedroAVJ/n"}, Some{"MIT"}, ["type checker", "prompts", "ambiguity"]},
+    Cl.Claude{None{}, True{},
+      [Cl.Field{E.key_option(), "OpenRouter API key", "The key N uses to ask Jev, through OpenRouter, which phrases of a prompt are unclear.", True{},
+        Cl.Text{True{}, None{}}}],
+      [Cl.Hook{Cl.UserPromptSubmit{}, [Cl.Group{None{}, [
+        Cl.Command{Cl.Exec{"${CLAUDE_PLUGIN_ROOT}/bin/n", ["hook"]}, Cl.Blocking{}, None{}, Some{120n}, Some{"N is checking the prompt"}}]}]}]},
+    Cx.Codex{[Cx.Hook{Cx.UserPromptSubmit{}, [Cx.Group{None{}, [
+      Cx.Command{"\"$PLUGIN_ROOT/bin/n\" hook", None{}, Some{120n}, Some{"N is checking the prompt"}, False{}, None{}}]}]}]}}
 
 def built(ok: Bool, +dir: String) -> IO(Unit):
   match ok:
@@ -149,7 +156,8 @@ def plugin(+dir: String) -> IO(Unit):
   do IO<Unit>:
     +home : String <- E.env("HOME")
     _ : Bool <- E.succeeds("mkdir", ["-p", dir ++ "/.claude-plugin", dir ++ "/bin"], 5000)
-    E.write(dir ++ "/.claude-plugin/plugin.json", PlO.render(manifest()))
+    E.write(dir ++ "/plugin.json", PlO.agent(package()))
+    E.write(dir ++ "/.claude-plugin/plugin.json", PlO.claude(package()))
     ok : Bool <- E.succeeds(home ++ "/.bend/bin/bend", ["n/n.bend", "-o", dir ++ "/bin/n"], 600000)
     built(ok, dir)
 

@@ -1,276 +1,94 @@
 import Base
 import bend-net-json@0.3.0.0/json.bend as Json
+import ./json.bend as J
 import ./type.bend as Pl
+import ./claude/ops.bend as ClO
+import ./codex/ops.bend as CxO
 
-# A plugin's manifest as the plugin.json Claude Code reads: optional keys are left out when absent.
+# A plugin's two manifests: the root plugin.json (Agent Plugins 1.0, which Codex reads) and
+# .claude-plugin/plugin.json (which Claude Code reads).
+
+def schema() -> String:
+  "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"
 
 def version_show(v: Pl.Version) -> String:
   match v:
     case Pl.Version{major, minor, patch}:
       Nat.show(major) ++ "." ++ Nat.show(minor) ++ "." ++ Nat.show(patch)
 
-# ---- JSON building ----
-def with.go(kvs: List<&2, Sigma<&2, &2, String, _ => Json.Val>>, m: Map<&2, Json.Val>) -> Map<&2, Json.Val>:
-  match kvs:
-    case []:
-      m
-    case (k, v) <> rest:
-      with.go(rest, Map.set(&2, Json.Val, m, k, v))
-
-def obj(kvs: List<&2, Sigma<&2, &2, String, _ => Json.Val>>) -> Json.Val:
-  Json.Obj{with.go(kvs, Map.new(&2, Json.Val))}
-
-# A key, or nothing when its value is absent.
-def opt(+k: String, m: Maybe<&2, Json.Val>) -> List<&2, Sigma<&2, &2, String, _ => Json.Val>>:
-  match m:
-    case Some{v}:
-      [(k, v)]
-    case None{}:
-      []
-
-def text(m: Maybe<&2, String>) -> Maybe<&2, Json.Val>:
-  match m:
-    case Some{s}:
-      Some{Json.Str{s}}
-    case None{}:
-      None{}
-
-def number(m: Maybe<&2, Nat>) -> Maybe<&2, Json.Val>:
-  match m:
-    case Some{n}:
-      Some{Json.Num{Nat.show(n)}}
-    case None{}:
-      None{}
-
-def flag(m: Maybe<&2, Bool>) -> Maybe<&2, Json.Val>:
-  match m:
-    case Some{b}:
-      Some{Json.Flag{b}}
-    case None{}:
-      None{}
-
-# A key that is true, or nothing: false is every flag's default.
-def when_true(+k: String, b: Bool) -> List<&2, Sigma<&2, &2, String, _ => Json.Val>>:
-  match b:
-    case True{}:
-      [(k, Json.Flag{True{}})]
-    case False{}:
-      []
-
-def strs(xs: List<&2, String>) -> List<&2, Json.Val>:
-  match xs:
-    case []:
-      []
-    case x <> rest:
-      Json.Str{x} <> strs(rest)
-
-def texts(xs: List<&2, String>) -> Json.Val:
-  Json.Arr{strs(xs)}
-
-def cat(xss: List<&2, List<&2, Sigma<&2, &2, String, _ => Json.Val>>>) -> Json.Val:
-  obj(List.concat(&2, Sigma<&2, &2, String, _ => Json.Val>, xss))
-
-# ---- userConfig ----
-def kind_keys(k: Pl.Input) -> List<&2, Sigma<&2, &2, String, _ => Json.Val>>:
-  match k:
-    case Pl.Text{sensitive, d}:
-      List.append(&2, Sigma<&2, &2, String, _ => Json.Val>, [("type", Json.Str{"string"})],
-        List.append(&2, Sigma<&2, &2, String, _ => Json.Val>, when_true("sensitive", sensitive), opt("default", text(d))))
-    case Pl.Choice{os, d}:
-      List.append(&2, Sigma<&2, &2, String, _ => Json.Val>, [("type", Json.Str{"string"}), ("options", texts(os))], opt("default", text(d)))
-    case Pl.Texts{d}:
-      [("type", Json.Str{"string"}), ("multiple", Json.Flag{True{}}), ("default", texts(d))]
-    case Pl.Number{lo, hi, d}:
-      List.concat(&2, Sigma<&2, &2, String, _ => Json.Val>, [[("type", Json.Str{"number"})], opt("min", number(lo)), opt("max", number(hi)), opt("default", number(d))])
-    case Pl.Boolean{d}:
-      List.append(&2, Sigma<&2, &2, String, _ => Json.Val>, [("type", Json.Str{"boolean"})], opt("default", flag(d)))
-    case Pl.Folder{d}:
-      List.append(&2, Sigma<&2, &2, String, _ => Json.Val>, [("type", Json.Str{"directory"})], opt("default", text(d)))
-    case Pl.Path{d}:
-      List.append(&2, Sigma<&2, &2, String, _ => Json.Val>, [("type", Json.Str{"file"})], opt("default", text(d)))
-
-def field(f: Pl.Field) -> Sigma<&2, &2, String, _ => Json.Val>:
-  match f:
-    case Pl.Field{key, title, description, required, k}:
-      (key, cat([[("title", Json.Str{title}), ("description", Json.Str{description})], when_true("required", required), kind_keys(k)]))
-
-def fields(fs: List<&2, Pl.Field>) -> List<&2, Sigma<&2, &2, String, _ => Json.Val>>:
-  match fs:
-    case []:
-      []
-    case f <> rest:
-      field(f) <> fields(rest)
-
-# ---- hooks ----
-def event_name(e: Pl.HookEvent) -> String:
-  match e:
-    case Pl.SessionStart{}:
-      "SessionStart"
-    case Pl.Setup{}:
-      "Setup"
-    case Pl.UserPromptSubmit{}:
-      "UserPromptSubmit"
-    case Pl.UserPromptExpansion{}:
-      "UserPromptExpansion"
-    case Pl.PreToolUse{}:
-      "PreToolUse"
-    case Pl.PermissionRequest{}:
-      "PermissionRequest"
-    case Pl.PermissionDenied{}:
-      "PermissionDenied"
-    case Pl.PostToolUse{}:
-      "PostToolUse"
-    case Pl.PostToolUseFailure{}:
-      "PostToolUseFailure"
-    case Pl.PostToolBatch{}:
-      "PostToolBatch"
-    case Pl.Notification{}:
-      "Notification"
-    case Pl.MessageDisplay{}:
-      "MessageDisplay"
-    case Pl.SubagentStart{}:
-      "SubagentStart"
-    case Pl.SubagentStop{}:
-      "SubagentStop"
-    case Pl.TaskCreated{}:
-      "TaskCreated"
-    case Pl.TaskCompleted{}:
-      "TaskCompleted"
-    case Pl.Stop{}:
-      "Stop"
-    case Pl.StopFailure{}:
-      "StopFailure"
-    case Pl.TeammateIdle{}:
-      "TeammateIdle"
-    case Pl.InstructionsLoaded{}:
-      "InstructionsLoaded"
-    case Pl.ConfigChange{}:
-      "ConfigChange"
-    case Pl.CwdChanged{}:
-      "CwdChanged"
-    case Pl.DirectoryAdded{}:
-      "DirectoryAdded"
-    case Pl.FileChanged{}:
-      "FileChanged"
-    case Pl.WorktreeCreate{}:
-      "WorktreeCreate"
-    case Pl.WorktreeRemove{}:
-      "WorktreeRemove"
-    case Pl.PreCompact{}:
-      "PreCompact"
-    case Pl.PostCompact{}:
-      "PostCompact"
-    case Pl.PreModelSwitch{}:
-      "PreModelSwitch"
-    case Pl.PostModelSwitch{}:
-      "PostModelSwitch"
-    case Pl.Elicitation{}:
-      "Elicitation"
-    case Pl.ElicitationResult{}:
-      "ElicitationResult"
-    case Pl.SessionEnd{}:
-      "SessionEnd"
-
-def shell_name(m: Maybe<&2, Pl.Shell>) -> Maybe<&2, Json.Val>:
-  match m:
-    case Some{Pl.Bash{}}:
-      Some{Json.Str{"bash"}}
-    case Some{Pl.PowerShell{}}:
-      Some{Json.Str{"powershell"}}
-    case None{}:
-      None{}
-
-def form_keys(f: Pl.Form) -> List<&2, Sigma<&2, &2, String, _ => Json.Val>>:
-  match f:
-    case Pl.Exec{command, args}:
-      [("command", Json.Str{command}), ("args", texts(args))]
-    case Pl.ShellForm{command, sh}:
-      List.append(&2, Sigma<&2, &2, String, _ => Json.Val>, [("command", Json.Str{command})], opt("shell", shell_name(sh)))
-
-def run_keys(r: Pl.Run) -> List<&2, Sigma<&2, &2, String, _ => Json.Val>>:
-  match r:
-    case Pl.Blocking{}:
-      []
-    case Pl.Async{}:
-      [("async", Json.Flag{True{}})]
-    case Pl.AsyncRewake{}:
-      [("asyncRewake", Json.Flag{True{}})]
-
-def handler(h: Pl.Handler) -> Json.Val:
-  match h:
-    case Pl.Command{f, r, w, t, s}:
-      cat([[("type", Json.Str{"command"})], form_keys(f), run_keys(r), opt("if", text(w)), opt("timeout", number(t)), opt("statusMessage", text(s))])
-
-def handlers(hs: List<&2, Pl.Handler>) -> List<&2, Json.Val>:
-  match hs:
-    case []:
-      []
-    case h <> rest:
-      handler(h) <> handlers(rest)
-
-def group(g: Pl.Group) -> Json.Val:
-  match g:
-    case Pl.Group{m, hs}:
-      cat([opt("matcher", text(m)), [("hooks", Json.Arr{handlers(hs)})]])
-
-def groups(gs: List<&2, Pl.Group>) -> List<&2, Json.Val>:
-  match gs:
-    case []:
-      []
-    case g <> rest:
-      group(g) <> groups(rest)
-
-def hooks(hs: List<&2, Pl.Hook>) -> List<&2, Sigma<&2, &2, String, _ => Json.Val>>:
-  match hs:
-    case []:
-      []
-    case Pl.Hook{e, gs} <> rest:
-      (event_name(e), Json.Arr{groups(gs)}) <> hooks(rest)
-
-# ---- the manifest ----
 def author(a: Pl.Author) -> Json.Val:
   match a:
     case Pl.Author{name, email, url}:
-      cat([[("name", Json.Str{name})], opt("email", text(email)), opt("url", text(url))])
+      J.cat([[("name", Json.Str{name})], J.opt("email", J.text(email)), J.opt("url", J.text(url))])
 
 def keywords(xs: List<&2, String>) -> List<&2, Sigma<&2, &2, String, _ => Json.Val>>:
   match xs:
     case []:
       []
     case x <> rest:
-      [("keywords", texts(x <> rest))]
+      [("keywords", J.texts(x <> rest))]
 
-def config(fs: List<&2, Pl.Field>) -> List<&2, Sigma<&2, &2, String, _ => Json.Val>>:
-  match fs:
+def core_keys(c: Pl.Core) -> List<&2, Sigma<&2, &2, String, _ => Json.Val>>:
+  match c:
+    case Pl.Core{name, v, description, a, homepage, repository, license, ks}:
+      List.concat(&2, Sigma<&2, &2, String, _ => Json.Val>, [
+        [("name", Json.Str{name}), ("version", Json.Str{version_show(v)}), ("description", Json.Str{description}), ("author", author(a))],
+        J.opt("homepage", J.text(homepage)), J.opt("repository", J.text(repository)), J.opt("license", J.text(license)), keywords(ks)])
+
+# Codex's extension, or nothing when Codex adds nothing.
+def extensions(kvs: List<&2, Sigma<&2, &2, String, _ => Json.Val>>) -> List<&2, Sigma<&2, &2, String, _ => Json.Val>>:
+  match kvs:
     case []:
       []
-    case f <> rest:
-      [("userConfig", obj(fields(f <> rest)))]
+    case kv <> rest:
+      [("extensions", J.obj([("com.openai", J.obj(kv <> rest))]))]
 
-def hooks_key(hs: List<&2, Pl.Hook>) -> List<&2, Sigma<&2, &2, String, _ => Json.Val>>:
-  match hs:
+# The root plugin.json's text.
+def agent(p: Pl.Package) -> String:
+  match p:
+    case Pl.Package{c, _, cx}:
+      Json.encode(J.cat([[("$schema", Json.Str{schema()})], core_keys(c), extensions(CxO.keys(cx))])) ++ "\n"
+
+# .claude-plugin/plugin.json's text.
+def claude(p: Pl.Package) -> String:
+  match p:
+    case Pl.Package{c, cl, _}:
+      Json.encode(J.cat([core_keys(c), ClO.keys(cl)])) ++ "\n"
+
+def name_of(p: Pl.Package) -> String:
+  match p:
+    case Pl.Package{Pl.Core{n, _, _, _, _, _, _, _}, _, _}:
+      n
+
+# ---- the standard's rule for a name ----
+def name_char(+c: Char) -> Bool:
+  Char.is_lower(c) || Char.is_digit(c) || Char.is_eq(c, '.') || Char.is_eq(c, '-')
+
+def edge_char(+c: Char) -> Bool:
+  Char.is_lower(c) || Char.is_digit(c)
+
+def repeats(cs: List<&2, Char>, +prev: Char) -> Bool:
+  match cs:
     case []:
-      []
-    case h <> rest:
-      [("hooks", obj(hooks(h <> rest)))]
+      False{}
+    case +c <> rest:
+      ((Char.is_eq(c, '-') || Char.is_eq(c, '.')) && Char.is_eq(c, prev)) || repeats(rest, c)
 
-# Enabled is Claude Code's default, so only a plugin that starts disabled says so.
-def enabled_key(b: Bool) -> List<&2, Sigma<&2, &2, String, _ => Json.Val>>:
-  match b:
-    case True{}:
-      []
-    case False{}:
-      [("defaultEnabled", Json.Flag{False{}})]
+def all_name_chars(cs: List<&2, Char>) -> Bool:
+  match cs:
+    case []:
+      True{}
+    case +c <> rest:
+      name_char(c) && all_name_chars(rest)
 
-def json(m: Pl.Manifest) -> Json.Val:
-  match m:
-    case Pl.Manifest{name, display, v, description, a, homepage, repository, license, ks, enabled, fs, hs}:
-      cat([
-        [("name", Json.Str{name})], opt("displayName", text(display)),
-        [("version", Json.Str{version_show(v)}), ("description", Json.Str{description}), ("author", author(a))],
-        opt("homepage", text(homepage)), opt("repository", text(repository)), opt("license", text(license)),
-        keywords(ks), enabled_key(enabled), config(fs), hooks_key(hs)])
+def first_ok(cs: List<&2, Char>) -> Bool:
+  match cs:
+    case []:
+      False{}
+    case +c <> _:
+      edge_char(c)
 
-# plugin.json's text.
-def render(m: Pl.Manifest) -> String:
-  Json.encode(json(m)) ++ "\n"
+# 1 to 64 of a-z, 0-9, . and -, starting and ending with a letter or digit, with no -- or ..
+def name_ok(+n: String) -> Bool:
+  Nat.is_ge(String.length(n), 1n) && Nat.is_le(String.length(n), 64n) && all_name_chars(String.to_list(n)) &&
+  first_ok(String.to_list(n)) && first_ok(String.to_list(String.reverse(n))) && Bool.not(repeats(String.to_list(n), ' '))

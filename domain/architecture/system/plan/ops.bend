@@ -62,13 +62,14 @@ def plugin_step(g: Rl.Plugin, t: P.Tag) -> P.Step:
     case Rl.Plugin{+n, ver, _, _, Rl.Repository{+r, _}} P.Tag{repo, tagged, +built, valid, differs}:
       +v = PlO.version_show(ver)
       +what = "plugin " ++ n ++ "@" ++ v
+      Bool.pick(P.Step, Bool.not(PlO.name_ok(n)), P.Blocked{what, "the name breaks Agent Plugins 1.0's rule: 1 to 64 of a-z, 0-9, . and -, a letter or digit at each end, no -- or .."},
       Bool.pick(P.Step, String.is_empty(built), P.Blocked{what, "does not build"},
         Bool.pick(P.Step, Bool.not(String.eq(built, v)), P.Blocked{what, "builds as version " ++ built},
         Bool.pick(P.Step, Bool.not(valid), P.Blocked{what, "claude plugin validate rejects the build"},
           Bool.pick(P.Step, Bool.not(repo), P.ReleasePlugin{n, v, r, True{}},
             Bool.pick(P.Step, Bool.not(tagged), P.ReleasePlugin{n, v, r, False{}},
               Bool.pick(P.Step, differs, P.Blocked{what, "changed since " ++ n ++ "-v" ++ v ++ " was released; give it a new version"},
-                P.Current{what}))))))
+                P.Current{what})))))))
 
 def plugin_steps(gs: List<&2, Rl.Plugin>, ts: List<&2, P.Tag>) -> List<&2, P.Step>:
   match gs:

@@ -242,17 +242,31 @@ def tag_states(+home: String, +root: String, gs: List<&2, Rl.Plugin>) -> IO(List
         ts : List<&2, P.Tag> <- tag_states(home, root, rest)
         return t <> ts
 
-# A release: the build into plugins/<name>, the listing updated, committed, tagged and pushed.
+# Codex's listing of the same marketplace (.agents/plugins/marketplace.json), with this plugin available and
+# every other plugin as it was.
+def codex_marketplace(+now: String, +n: String, +r: String) -> String:
+  +m = Json.parse(now)
+  Json.encode(obj([
+    ("name", Json.Str{last_segment(String.split(r, '/'))}),
+    ("interface", obj([("displayName", Json.Str{last_segment(String.split(r, '/'))})])),
+    ("plugins", Json.Arr{List.append(&2, Json.Val, others(listed(Bool.pick(Maybe<&2, Json.Val>, Maybe.is_some(&2, Json.Val, m), Json.get(Maybe.default(&2, Json.Val, m, Json.Null{}), "plugins"), None{})), n),
+      [obj([("name", Json.Str{n}), ("source", obj([("source", Json.Str{"local"}), ("path", Json.Str{"./plugins/" ++ n})])),
+        ("policy", obj([("installation", Json.Str{"AVAILABLE"}), ("authentication", Json.Str{"ON_USE"})])),
+        ("category", Json.Str{"Productivity"})])])})])) ++ "\n"
+
+# A release: the build into plugins/<name>, both listings updated, committed, tagged and pushed.
 def release_plugin(+root: String, +n: String, +v: String, +r: String, create: Bool) -> IO(Bool):
   do IO<Bool>:
     +repo : String = plugin_dir(root, n) ++ "/repo"
     _ : Bool <- Bool.pick(IO(Bool), create, X.succeeds("gh", ["repo", "create", r, "--public", "--description", "Claude Code plugins, built and released by V."]), IO.pure(Bool, True{}))
     _ : Bool <- X.succeeds("rm", ["-rf", repo])
     _ : Bool <- X.succeeds("git", ["clone", "-q", "https://github.com/" ++ r, repo])
-    _ : Bool <- X.succeeds("mkdir", ["-p", repo ++ "/plugins/" ++ n, repo ++ "/.claude-plugin"])
+    _ : Bool <- X.succeeds("mkdir", ["-p", repo ++ "/plugins/" ++ n, repo ++ "/.claude-plugin", repo ++ "/.agents/plugins"])
     _ : Bool <- X.succeeds("rsync", ["-a", "--delete", plugin_dir(root, n) ++ "/build/", repo ++ "/plugins/" ++ n ++ "/"])
     now : String <- X.read(repo ++ "/.claude-plugin/marketplace.json")
     X.write(repo ++ "/.claude-plugin/marketplace.json", marketplace(now, n, v, r))
+    codex_now : String <- X.read(repo ++ "/.agents/plugins/marketplace.json")
+    X.write(repo ++ "/.agents/plugins/marketplace.json", codex_marketplace(codex_now, n, r))
     _ : Bool <- X.succeeds("git", ["-C", repo, "add", "-A"])
     _ : Bool <- X.succeeds("git", ["-C", repo, "commit", "-q", "-m", n ++ " " ++ v])
     _ : Bool <- X.succeeds("git", ["-C", repo, "tag", tag_of(n, v)])

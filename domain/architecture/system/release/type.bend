@@ -9,10 +9,11 @@ type Package is Data:
 type Repository is Data:
   Repository{name: String, public: Bool}
 
-# A Claude Code plugin: built by its entry's `plugin <dir>` command at its version (semver), shipping its
-# components, and released into a marketplace: a GitHub repository holding each plugin under
-# plugins/<name>, listed in its .claude-plugin/marketplace.json, and tagged <name>-v<version>. The
-# marketplace is named after its repository.
+# A plugin for Claude Code and Codex: built by its entry's `plugin <dir>` command at its version (semver),
+# shipping its components, and released into a marketplace: a GitHub repository holding each plugin under
+# plugins/<name>, listed for Claude Code in .claude-plugin/marketplace.json and for Codex in
+# .agents/plugins/marketplace.json, and tagged <name>-v<version>. The marketplace is named after its
+# repository.
 type Plugin is Data:
   Plugin{name: String, version: Pl.Version, entry: String, components: List<&2, String>, marketplace: Repository}
 

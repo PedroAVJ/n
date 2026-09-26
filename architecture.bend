@@ -34,13 +34,16 @@ def library() -> Ct.Container:
       Co.Component{"plan", "Plan and deploy", "What a deploy would change, and changing it.", Co.Bend{},
         [ uses("architecture", "Reads the release from", ""),
           uses("bend", "Publishes packages with", "bend --publish"),
-          uses("github", "Pushes source to", "git") ]} ], []}
+          uses("github", "Pushes source to", "git") ]},
+      Co.Component{"n", "N", "A type checker for prompts: flags each phrase with more than one reading before an agent acts on it.", Co.Bend{},
+        [uses("openrouter", "Asks Jev which phrases are unclear through", "HTTPS"), uses("claude", "Checks each prompt as a hook of", "UserPromptSubmit")]} ], []}
 
 def system() -> S.System:
   S.System{"v", "V", "Data structures for your Bend algorithms.", [library()],
     D.Deployment{"", [], [], [D.Node{"machine", "Their machine", "macOS or Linux", D.Device{}, H.Other{}, D.Unmanaged{}, [], ["library"]}]},
     Rl.Release{Rl.Repository{"PedroAVJ/n", True{}},
-      [Rl.Package{"near-v-framework", "0.3.0.1", "v.bend", ["rose", "compound", "architecture", "view", "plan"]}]}}
+      [ Rl.Package{"near-v-framework", "0.3.0.1", "v.bend", ["rose", "compound", "architecture", "view", "plan"]},
+        Rl.Package{"near-n-checker", "0.2.0.0", "n/n.bend", ["n"]} ]}}
 
 def external(+k: String, +n: String, +d: String, c: C.Category, us: List<&2, Rel.Relationship>) -> X.External:
   X.External{k, n, d, c, [], [], [], us}
@@ -52,7 +55,9 @@ def environment() -> En.Environment:
     [ external("bend", "Bend", "Checks, proves, runs and publishes Bend programs.", C.Cli{}, [uses("hub", "Publishes packages to", "HTTPS")]),
       external("hub", "Bend hub", "Hosts Bend packages.", C.DataApi{}, []),
       external("github", "GitHub", "Hosts V's source.", C.DataApi{}, []),
-      external("d2", "D2", "Draws diagrams from text.", C.Cli{}, []) ],
+      external("d2", "D2", "Draws diagrams from text.", C.Cli{}, []),
+      external("openrouter", "OpenRouter", "Serves Jev, the model that reads each phrase.", C.ModelApi{}, []),
+      external("claude", "Claude Code", "Runs N before it reads a prompt.", C.Cli{}, []) ],
     [K.OpenSource{}],
     I.Inventory{I.Vendor{"", ""}, []},
     G.Agreement{"", [], [], []}}

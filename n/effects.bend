@@ -1,0 +1,180 @@
+import Base
+import bend-net-json@0.3.0.0/json.bend as Json
+import ./check.bend as C
+
+# N's effects: the hook's input, the conversation so far, the OpenRouter key, and the call to Jev.
+# Every failure answers "" so that a broken check never stands between the person and their prompt.
+
+# ---- standard input ----
+def stdin_read(r: File & Result<&1, &1, U32 & String, String>) -> IO(String):
+  match r:
+    case (f, Done{t}):
+      do IO<String>:
+        File.close(f)
+        return t
+    case (f, Fail{_}):
+      do IO<String>:
+        File.close(f)
+        return ""
+
+def stdin_opened(r: Result<&1, &1, U32 & String, File>) -> IO(String):
+  match r:
+    case Done{f}:
+      do IO<String>:
+        got : File & Result<&1, &1, U32 & String, String> <- File.read(f, 4194304)
+        stdin_read(got)
+    case Fail{_}:
+      IO.pure(String, "")
+
+def stdin() -> IO(String):
+  do IO<String>:
+    r : Result<&1, &1, U32 & String, File> <- File.open("/dev/stdin", "r")
+    stdin_opened(r)
+
+# ---- running a program: its standard output when it exits 0, else "" ----
+def out_of(r: Result<&1, &1, U32 & String, U32 & (String & String)>) -> String:
+  match r:
+    case Done{(+status, (out, _))}:
+      Bool.pick(String, U32.is_eq(status, 0), out, "")
+    case Fail{_}:
+      ""
+
+def run(program: String, args: List<String>, input: String, +timeout_ms: U32) -> IO(String):
+  do IO<String>:
+    r : Result<&1, &1, U32 & String, U32 & (String & String)> <- Process.run(program, args, input, 8388608, timeout_ms)
+    return out_of(r)
+
+def env(name: String) -> IO(String):
+  do IO<String>:
+    r : Result<&1, &1, U32 & String, String> <- IO.get_env(name)
+    return Result.default(&1, &1, U32 & String, String, r, "")
+
+# ---- the conversation so far, from the transcript Claude Code keeps ----
+def part(+v: Json.Val) -> String:
+  Bool.pick(String, String.eq(C.text(Json.get(v, "type")), "text"), C.text(Json.get(v, "text")), "")
+
+def parts(vs: List<&2, Json.Val>) -> String:
+  match vs:
+    case []:
+      ""
+    case v <> rest:
+      part(v) ++ parts(rest)
+
+# A message's text: its content when it is a string, else its text blocks. Tool calls and their
+# results have none.
+def content(m: Maybe<&2, Json.Val>) -> String:
+  match m:
+    case Some{Json.Str{s}}:
+      s
+    case Some{Json.Arr{vs}}:
+      parts(vs)
+    case _:
+      ""
+
+def said(+role: String, +t: String) -> String:
+  Bool.pick(String, (String.eq(role, "user") || String.eq(role, "assistant")) && Bool.not(String.is_empty(String.trim(t))),
+    role ++ ": " ++ String.take(String.trim(t), 1500n), "")
+
+def entry(+line: String) -> String:
+  +v = Json.parse(line)
+  said(C.text(C.at(v, "type")), content(C.at(C.at(v, "message"), "content")))
+
+def entries(ls: List<&2, String>) -> List<&2, String>:
+  match ls:
+    case []:
+      []
+    case +l <> rest:
+      +e = entry(l)
+      +r = entries(rest)
+      Bool.pick(List<&2, String>, String.is_empty(e), r, e <> r)
+
+def drop_partial(ls: List<&2, String>) -> List<&2, String>:
+  match ls:
+    case []:
+      []
+    case _ <> rest:
+      rest
+
+# The last messages of the conversation, oldest first. The transcript's tail starts mid-line, so its
+# first line is dropped.
+def conversation(+path: String) -> IO(String):
+  do IO<String>:
+    tail : String <- run("tail", ["-c", "60000", path], "", 3000)
+    +said : List<&2, String> = entries(drop_partial(String.lines(tail)))
+    return String.join(List.drop(&2, String, said, Nat.sub(List.length(&2, String, said), 8n)), "\n\n")
+
+# ---- the OpenRouter key: $OPENROUTER_API_KEY, else the Keychain item N owns ----
+def keychain_service() -> String:
+  "com.pedro.n.openrouter"
+
+def key_from(empty: Bool, e: String) -> IO(String):
+  match empty:
+    case True{}:
+      do IO<String>:
+        k : String <- run("security", ["find-generic-password", "-s", keychain_service(), "-w"], "", 5000)
+        return String.trim(k)
+    case False{}:
+      IO.pure(String, e)
+
+def key() -> IO(String):
+  do IO<String>:
+    +e : String <- env("OPENROUTER_API_KEY")
+    key_from(String.is_empty(String.trim(e)), String.trim(e))
+
+# ---- asking Jev ----
+def esc.go(cs: List<&2, Char>) -> List<&2, Char>:
+  match cs:
+    case []:
+      []
+    case +c <> rest:
+      +r = esc.go(rest)
+      Bool.pick(List<&2, Char>, Char.is_eq(c, '\\') || Char.is_eq(c, '"'), '\\' <> c <> r, c <> r)
+
+# A string for curl's config syntax: backslashes and quotes escaped.
+def esc(s: String) -> String:
+  String.from_list(esc.go(String.to_list(s)))
+
+def decisions_url() -> String:
+  "https://openrouter.ai/api/alpha/decisions"
+
+# The key and the body go to curl on its standard input, so neither shows up in the process list.
+def curl_config(+url: String, +k: String, +body: String) -> String:
+  "url = \"" ++ esc(url) ++ "\"\n" ++
+  "header = \"Content-Type: application/json\"\n" ++
+  "header = \"Authorization: Bearer " ++ esc(k) ++ "\"\n" ++
+  "data-binary = \"" ++ esc(body) ++ "\"\n"
+
+def ask(+url: String, +k: String, +body: String) -> IO(String):
+  run("curl", ["-sS", "--fail", "--max-time", "12", "--config", "-"], curl_config(url, k, body), 14000)
+
+# ---- building the plugin ----
+def succeeded(r: Result<&1, &1, U32 & String, U32 & (String & String)>) -> Bool:
+  match r:
+    case Done{(+status, _)}:
+      U32.is_eq(status, 0)
+    case Fail{_}:
+      False{}
+
+def succeeds(program: String, args: List<String>, +timeout_ms: U32) -> IO(Bool):
+  do IO<Bool>:
+    r : Result<&1, &1, U32 & String, U32 & (String & String)> <- Process.run(program, args, "", 8388608, timeout_ms)
+    return succeeded(r)
+
+def written(r: File & Result<&1, &1, U32 & String, Unit>) -> IO(Unit):
+  match r:
+    case (f, _):
+      File.close(f)
+
+def write_opened(r: Result<&1, &1, U32 & String, File>, text: String) -> IO(Unit):
+  match r:
+    case Done{f}:
+      do IO<Unit>:
+        w : File & Result<&1, &1, U32 & String, Unit> <- File.write(f, text)
+        written(w)
+    case Fail{_}:
+      IO.die(Unit, 1, "cannot write a file")
+
+def write(path: String, text: String) -> IO(Unit):
+  do IO<Unit>:
+    r : Result<&1, &1, U32 & String, File> <- File.open(path, "w")
+    write_opened(r, text)

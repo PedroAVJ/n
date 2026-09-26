@@ -1,7 +1,10 @@
 # V: data structures for your Bend algorithms.
+# General purpose: the rose tree and the compound graph. Domain: a software system's architecture, in
+# its environment, drawn as C4 views and released through a plan.
 import Base
-import ./cli/main.bend as Command
-import ./lib/deploy.bend as Deploy
-import ./lib/azure.bend as Azure
-import ./lib/text.bend as Text
-import ./c4/c4.bend as C4
+import ./general/rose/PROOF.bend as RoseProof
+import ./general/compound/ops.bend as Compound
+import ./domain/architecture/PROOF.bend as ArchitectureProof
+import ./domain/architecture/system/ops.bend as System
+import ./domain/architecture/system/effects.bend as SystemEffects
+import ./domain/architecture/view/effects.bend as ViewEffects

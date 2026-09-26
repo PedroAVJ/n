@@ -260,7 +260,7 @@ def node_lines(ns: List<&2, D.Node>, +prefix: String, +rs: List<&2, R.Rose<A.Ele
       ""
     case n <> rest:
       match n:
-        case D.Node{+k, name, +t, _, kids, ins}:
+        case D.Node{+k, name, +t, _, _, _, kids, ins}:
           prefix ++ "d_" ++ k ++ ": \"" ++ name ++ "\\n" ++ node_kind(t) ++ "\" {style.fill: \"#FFFFFF\"; style.stroke: \"#888888\"; style.font-color: \"#000000\"}\n" ++
             instance_boxes(ins, prefix ++ "d_" ++ k ++ ".", rs) ++ node_lines(kids, prefix ++ "d_" ++ k ++ ".", rs) ++ node_lines(rest, prefix, rs)
 
@@ -281,7 +281,7 @@ def places(ns: List<&2, D.Node>, +prefix: String) -> List<&2, Placed>:
       []
     case n <> rest:
       match n:
-        case D.Node{+k, _, _, _, kids, ins}:
+        case D.Node{+k, _, _, _, _, _, kids, ins}:
           List.append(&2, Placed, instance_places(ins, prefix ++ "d_" ++ k ++ "."),
             List.append(&2, Placed, places(kids, prefix ++ "d_" ++ k ++ "."), places(rest, prefix)))
 
@@ -331,7 +331,7 @@ def path_lines(es: List<&2, E.Edge>) -> String:
 
 def deployment_view(+a: A.Architecture) -> String:
   +c = O.to_compound(a)
-  +ns = O.deployment(a)
+  +ns = O.nodes(a)
   header(title(a, roots(c), Vw.Deployment{})) ++ node_lines(ns, "", roots(c)) ++
     path_lines(instance_edges(CO.lift(A.Element, c, O.container_keys(O.containers(a))), places(ns, "")))
 

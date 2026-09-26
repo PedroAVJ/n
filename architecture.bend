@@ -11,39 +11,51 @@ import ./domain/architecture/environment/party/type.bend as P
 import ./domain/architecture/environment/external/type.bend as X
 import ./domain/architecture/environment/constraint/type.bend as K
 import ./domain/architecture/view/type.bend as Vw
+import ./domain/architecture/category/type.bend as C
+import ./domain/architecture/system/deployment/host/type.bend as H
+import ./domain/architecture/environment/inventory/type.bend as I
+import ./domain/architecture/environment/agreement/type.bend as G
 
 # V's own architecture: a Bend library that builders import to describe, check and deploy their systems.
 
+def uses(+d: String, +what: String, +how: String) -> Rel.Relationship:
+  Rel.Relationship{d, what, how, False{}}
+
 def library() -> Ct.Container:
-  Ct.Container{"library", "V", "Data structures for Bend: general ones, and a software system's architecture.", "Bend 2", Ct.Ours{}, Ct.Local{}, [], [
-    Co.Component{"rose", "Rose tree", "A keyed value and any number of children.", "Bend 2", []},
-    Co.Component{"compound", "Compound graph", "Rose trees plus edges, and lifting edges to what shows.", "Bend 2",
-      [Rel.Relationship{"rose", "Builds on", ""}]},
-    Co.Component{"architecture", "Architecture", "A software system in its environment, and its laws.", "Bend 2",
-      [Rel.Relationship{"compound", "Is a", ""}]},
-    Co.Component{"view", "Views", "C4's views of an architecture, drawn with D2.", "Bend 2",
-      [Rel.Relationship{"architecture", "Draws", ""}, Rel.Relationship{"d2", "Renders diagrams with", "d2"}]},
-    Co.Component{"plan", "Plan and deploy", "What a release would change, and changing it.", "Bend 2",
-      [ Rel.Relationship{"architecture", "Reads the release from", ""},
-        Rel.Relationship{"bend", "Publishes packages with", "bend --publish"},
-        Rel.Relationship{"github", "Pushes source to", "git"} ]} ], []}
+  Ct.Container{"library", "V", "Data structures for Bend: general ones, and a software system's architecture.",
+    C.Library{}, Ct.Ours{}, Ct.Local{}, [], ".", [], [], [], ["Bend", "C", "JavaScript"], [], [
+      Co.Component{"rose", "Rose tree", "A keyed value and any number of children.", Co.Bend{}, []},
+      Co.Component{"compound", "Compound graph", "Rose trees plus edges, and lifting edges to what shows.", Co.Bend{},
+        [uses("rose", "Builds on", "")]},
+      Co.Component{"architecture", "Architecture", "A software system in its environment, and its laws.", Co.Bend{},
+        [uses("compound", "Is a", "")]},
+      Co.Component{"view", "Views", "C4's views of an architecture, drawn with D2.", Co.Bend{},
+        [uses("architecture", "Draws", ""), uses("d2", "Renders diagrams with", "d2")]},
+      Co.Component{"plan", "Plan and deploy", "What a deploy would change, and changing it.", Co.Bend{},
+        [ uses("architecture", "Reads the release from", ""),
+          uses("bend", "Publishes packages with", "bend --publish"),
+          uses("github", "Pushes source to", "git") ]} ], []}
 
 def system() -> S.System:
   S.System{"v", "V", "Data structures for your Bend algorithms.", [library()],
-    [D.Node{"machine", "Their machine", "macOS or Linux", D.Device{}, [], ["library"]}],
+    D.Deployment{"", [], [], [D.Node{"machine", "Their machine", "macOS or Linux", D.Device{}, H.Other{}, D.Unmanaged{}, [], ["library"]}]},
     Rl.Release{Rl.Repository{"PedroAVJ/n", True{}},
       [Rl.Package{"near-v-framework", "0.3.0.0", "v.bend", ["rose", "compound", "architecture", "view", "plan"]}]}}
+
+def external(+k: String, +n: String, +d: String, c: C.Category, us: List<&2, Rel.Relationship>) -> X.External:
+  X.External{k, n, d, c, [], [], [], us}
 
 def environment() -> En.Environment:
   En.Environment{
     [P.Organization{"builders", "Builders", "Build systems in Bend and prove their laws.", P.Community{},
-      [ Rel.Relationship{"architecture", "Describe their systems with", "Bend import"},
-        Rel.Relationship{"bend", "Run their system.bend with", "bend"} ]}],
-    [ X.External{"bend", "Bend", "Checks, proves, runs and publishes Bend programs.", [Rel.Relationship{"hub", "Publishes packages to", "HTTPS"}]},
-      X.External{"hub", "Bend hub", "Hosts Bend packages.", []},
-      X.External{"github", "GitHub", "Hosts V's source.", []},
-      X.External{"d2", "D2", "Draws diagrams from text.", []} ],
-    [K.OpenSource{}]}
+      [uses("architecture", "Describe their systems with", "Bend import"), uses("bend", "Run their system.bend with", "bend")]}],
+    [ external("bend", "Bend", "Checks, proves, runs and publishes Bend programs.", C.Cli{}, [uses("hub", "Publishes packages to", "HTTPS")]),
+      external("hub", "Bend hub", "Hosts Bend packages.", C.DataApi{}, []),
+      external("github", "GitHub", "Hosts V's source.", C.DataApi{}, []),
+      external("d2", "D2", "Draws diagrams from text.", C.Cli{}, []) ],
+    [K.OpenSource{}],
+    I.Inventory{I.Vendor{"", ""}, []},
+    G.Agreement{"", [], [], []}}
 
 def architecture() -> A.Architecture:
   A.Architecture{system(), environment()}

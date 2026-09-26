@@ -11,29 +11,35 @@ import ./domain/architecture/view/effects.bend as VE
 #   bend system.bend dryrun    what a deploy would change
 #   bend system.bend deploy    change it: publish the package, push the source
 #   bend system.bend diagram   draw V's views into diagrams/
+#   bend system.bend import    print each nix-darwin Mac's current settings as Bend
 
 def dryrun() -> IO(Unit):
   do IO<Unit>:
     +root : String <- SE.root()
-    o : P.Observed <- SE.observe(root, "system.bend", SO.release(V.system()))
-    IO.print(PO.show_all(PO.plan(SO.release(V.system()), o)))
+    steps : List<&2, P.Step> <- SE.plan_all(root, "system.bend", V.architecture())
+    IO.print(PO.show_all(steps))
 
 def deploy() -> IO(Unit):
   do IO<Unit>:
     +root : String <- SE.root()
-    o : P.Observed <- SE.observe(root, "system.bend", SO.release(V.system()))
-    SE.deploy(root, PO.plan(SO.release(V.system()), o))
+    SE.deploy_all(root, "system.bend", V.architecture())
 
 def diagram() -> IO(Unit):
   do IO<Unit>:
     +root : String <- SE.root()
     VE.render(V.architecture(), root ++ "/diagrams", V.views())
 
+def import_mac() -> IO(Unit):
+  do IO<Unit>:
+    +root : String <- SE.root()
+    SE.import_all(root, V.architecture())
+
 def command(+c: String) -> IO(Unit):
   Bool.pick(IO(Unit), String.eq(c, "dryrun"), dryrun(),
+    Bool.pick(IO(Unit), String.eq(c, "import"), import_mac(),
     Bool.pick(IO(Unit), String.eq(c, "deploy"), deploy(),
       Bool.pick(IO(Unit), String.eq(c, "diagram"), diagram(),
-        IO.print("usage: bend system.bend dryrun | deploy | diagram"))))
+        IO.print("usage: bend system.bend dryrun | deploy | diagram | import")))))
 
 def first(xs: List<&1, String>) -> String:
   match xs:

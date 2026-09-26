@@ -80,6 +80,12 @@ def show(s: P.Step) -> String:
       "publish  " ++ n ++ "@" ++ v
     case P.Push{r}:
       "push     github " ++ r
+    case P.Rebuild{h, _, _}:
+      "rebuild  nix-darwin " ++ h
+    case P.ServePort{p, t, _}:
+      "serve    :" ++ U32.show(p) ++ " -> " ++ t
+    case P.Change{w, now, want}:
+      "change   " ++ w ++ ": " ++ now ++ " -> " ++ want
     case P.Blocked{w, why}:
       "blocked  " ++ w ++ ": " ++ why
 

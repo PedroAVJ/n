@@ -22,18 +22,28 @@ general/                 useful anywhere
    └─ edge/
 domain/
 └─ architecture/         a software system in its environment
+   ├─ category/          what a container or outside system is, and what it provides
    ├─ relationship/      stored on its source: what it does with its destination, and how
-   ├─ system/            containers and components, where they run, and what the system publishes
-   │  ├─ container/
+   ├─ system/
+   │  ├─ container/      its technology (vendors, frameworks, libraries, languages), checked against the repository
    │  │  └─ component/
-   │  ├─ deployment/
-   │  ├─ release/
-   │  └─ plan/
-   ├─ environment/       who uses it, the systems around it, and its constraints
+   │  ├─ deployment/     the address, the data stores that must survive, and the machines
+   │  │  ├─ host/        an owned device, a provider's cloud, or someone else's
+   │  │  ├─ nix-darwin/  a Mac: its flake, services, Tailscale serves, listeners and launch agents
+   │  │  │  ├─ service/
+   │  │  │  ├─ setting/  macOS settings and the firewall (mac.nix)
+   │  │  │  └─ brew/     Homebrew
+   │  │  └─ azure/       declared resources, checked against the subscription
+   │  ├─ release/        the packages and the repository it publishes
+   │  ├─ plan/           what a deploy would do
+   │  └─ effs/           running programs; reading and writing files
+   ├─ environment/
    │  ├─ party/
    │  ├─ external/
-   │  └─ constraint/
-   └─ view/              C4's views (context, containers, components, deployment, dynamic), drawn with D2
+   │  ├─ constraint/
+   │  ├─ inventory/      the devices the owner has, and its cloud
+   │  └─ agreement/      the organization's people, identities, grants and budgets
+   └─ view/              C4's views, drawn with D2
 ```
 
 `v.bend` imports all of it.
@@ -67,13 +77,21 @@ proofs, so it compiles only while the laws hold: checking is compiling, and noth
 bend system.bend dryrun     # what a deploy would change
 bend system.bend deploy     # change it
 bend system.bend diagram    # draw the views into diagrams/
+bend system.bend import     # print each nix-darwin Mac's current settings as Bend
 bend system.bend --check-only
 ```
 
-This repository is one: `architecture.bend` is V's own architecture. A deploy publishes the package
-and pushes the repository, and stops first if a file is not Bend, a file no entry reaches (dead
-code), a package changed without a new version, uncommitted changes, or GitHub's visibility
-differing from the declared one.
+This repository is one: `architecture.bend` is V's own architecture. A plan covers the release (the
+package, the repository), each container's technology against the repository, each deployment node
+(a nix-darwin Mac: its settings, Homebrew, services, serves, listeners and launch agents; an Azure
+subscription: its resources and who may access them), and what the deploy would break compared with
+the last deploy (recorded in `.git/v-deployed`). It stops first on a file that is not Bend, dead code,
+a package changed without a new version, uncommitted changes, a visibility GitHub disagrees with, or
+any runtime check that fails.
+
+Bend's JavaScript lane (`bend file.bend`) overflows on deep recursion (see Bend's WONTFIX), so V reads
+only the heads of files where that is all it needs, compares files with `cmp`, and splits long outputs
+without deep recursion.
 
 ## License
 

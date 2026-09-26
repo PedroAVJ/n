@@ -7,6 +7,12 @@ def Laws.components_ours():
   {==}
 def Laws.servers_private():
   {==}
+def Laws.devices_via_tailnet():
+  {==}
+def Laws.exposure_follows_reach():
+  {==}
+def Laws.shared_hosting_private():
+  {==}
 def Laws.packages_ok():
   {==}
 def Laws.components_published():

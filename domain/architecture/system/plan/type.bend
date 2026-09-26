@@ -14,9 +14,15 @@ type Remote is Data:
 type Observed is Data:
   Observed{files: List<&2, String>, reached: List<&2, String>, hubs: List<&2, Hub>, remote: Remote}
 
-# One step of a plan. Publish and Push change the world; Current does not; Blocked stops the deploy.
+# One step of a plan. Publish, Push, Rebuild and ServePort change the world; Current and Change do not
+# (a Change is what a Rebuild would change, shown by a dry run); Blocked stops the deploy.
+# Rebuild: write a nix-darwin node's flake and darwin-rebuild switch it. ServePort: serve a tailnet
+# HTTPS port from a local target, with the given Tailscale command.
 type Step is Data:
   Current{what: String}
   Publish{name: String, version: String, entry: String}
   Push{repository: String}
+  Rebuild{host: String, flake: String, mac: String}
+  ServePort{https: U32, target: String, tailscale: String}
+  Change{what: String, now: String, want: String}
   Blocked{what: String, why: String}

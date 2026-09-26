@@ -14,6 +14,15 @@ law components_ours:
 law servers_private:
   {O.servers_private(V.architecture()) == True{} : Bool}
 
+# A device reaches a server only over the tailnet; on a server, only what a device reaches is on the
+# tailnet; a data API hosts the app only while private.
+law devices_via_tailnet:
+  {O.devices_via_tailnet(V.architecture()) == True{} : Bool}
+law exposure_follows_reach:
+  {O.exposure_follows_reach(V.architecture()) == True{} : Bool}
+law shared_hosting_private:
+  {O.shared_hosting_private(V.architecture()) == True{} : Bool}
+
 # Every package follows the hub's rules, and everything V is made of ships in one.
 law packages_ok:
   {RlO.packages_ok(RlO.packages(SO.release(V.system()))) == True{} : Bool}

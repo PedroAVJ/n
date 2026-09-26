@@ -82,8 +82,9 @@ bend system.bend --check-only
 ```
 
 This repository is one: `architecture.bend` is V's own architecture. A plan covers the release (the
-packages; each Claude Code plugin, built fresh and compared with the tag `<name>-v<version>` in the
-marketplace it releases into, a GitHub repository holding each plugin under `plugins/<name>`; the
+packages; each Claude Code plugin, built fresh from its typed manifest
+(`release/plugin/`, after Claude Code's plugin schema), checked by `claude plugin validate --strict`, and
+compared with the tag `<name>-v<version>` in the marketplace it releases into, a GitHub repository holding each plugin under `plugins/<name>`; the
 repository), each container's technology against the repository, each deployment node
 (a nix-darwin Mac: its settings, Homebrew, services, serves, listeners and launch agents; an Azure
 subscription: its resources and who may access them), and what the deploy would break compared with

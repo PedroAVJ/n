@@ -19,6 +19,7 @@ import ./deployment/nix_darwin/brew/effects.bend as BrE
 import ./deployment/nix_darwin/service/ops.bend as SvO
 import ./release/type.bend as Rl
 import ./release/ops.bend as RlO
+import ./release/plugin/ops.bend as PlO
 import ./plan/type.bend as P
 import ./plan/ops.bend as PO
 import ./ops.bend as SO
@@ -220,14 +221,16 @@ def tag_differs(tagged: Bool, +root: String, +n: String, +v: String, +r: String)
 
 def tag_state(+home: String, +root: String, g: Rl.Plugin) -> IO(P.Tag):
   match g:
-    case Rl.Plugin{+n, +v, +e, _, Rl.Repository{+r, _}}:
+    case Rl.Plugin{+n, ver, +e, _, Rl.Repository{+r, _}}:
       do IO<P.Tag>:
+        +v : String = PlO.version_show(ver)
         built : String <- build_plugin(root, home ++ "/.bend/bin/bend", n, e)
+        valid : Bool <- X.succeeds("claude", ["plugin", "validate", "--strict", plugin_dir(root, n) ++ "/build"])
         +repo : Bool <- X.succeeds("gh", ["repo", "view", r, "--json", "name"])
         tags : String <- X.run("git", ["ls-remote", "--tags", "https://github.com/" ++ r, "refs/tags/" ++ tag_of(n, v)])
         +tagged : Bool = repo && Bool.not(String.is_empty(String.trim(tags)))
         differs : Bool <- tag_differs(tagged, root, n, v, r)
-        return P.Tag{repo, tagged, built, differs}
+        return P.Tag{repo, tagged, built, valid, differs}
 
 def tag_states(+home: String, +root: String, gs: List<&2, Rl.Plugin>) -> IO(List<&2, P.Tag>):
   match gs:

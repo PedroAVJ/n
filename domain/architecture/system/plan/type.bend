@@ -11,10 +11,11 @@ type Remote is Data:
   Remote{origin: String, visibility: String, clean: Bool, pushed: Bool}
 
 # What GitHub has for one declared plugin, next to a fresh build of it: whether its marketplace exists,
-# whether it is tagged <name>-v<version>, the version the build declares ("" when it did not build), and
-# whether the build differs from what the tag holds.
+# whether it is tagged <name>-v<version>, the version the build declares ("" when it did not build),
+# whether `claude plugin validate` accepts the build, and whether the build differs from what the tag
+# holds.
 type Tag is Data:
-  Tag{repository: Bool, tagged: Bool, built: String, differs: Bool}
+  Tag{repository: Bool, tagged: Bool, built: String, valid: Bool, differs: Bool}
 
 # What the world looks like now, as far as a release is concerned.
 type Observed is Data:

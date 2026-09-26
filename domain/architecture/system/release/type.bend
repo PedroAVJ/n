@@ -1,4 +1,5 @@
 import Base
+import ./plugin/type.bend as Pl
 
 # A package on the Bend hub: its name, version (four numbers), entry file and the components it ships.
 type Package is Data:
@@ -13,7 +14,7 @@ type Repository is Data:
 # plugins/<name>, listed in its .claude-plugin/marketplace.json, and tagged <name>-v<version>. The
 # marketplace is named after its repository.
 type Plugin is Data:
-  Plugin{name: String, version: String, entry: String, components: List<&2, String>, marketplace: Repository}
+  Plugin{name: String, version: Pl.Version, entry: String, components: List<&2, String>, marketplace: Repository}
 
 # What the system publishes.
 type Release is Data:

@@ -2,7 +2,8 @@ import Base
 import bend-net-json@0.3.0.0/json.bend as Json
 import ./check.bend as C
 
-# N's effects: the hook's input, the conversation so far, the OpenRouter key, and the call to Jev.
+# N's effects: the hook's input, the conversation so far, the OpenRouter key, and the calls to Jev and
+# Claude.
 # Every failure answers "" so that a broken check never stands between the person and their prompt.
 
 # ---- standard input ----
@@ -103,23 +104,15 @@ def conversation(+path: String) -> IO(String):
     +said : List<&2, String> = entries(drop_partial(String.lines(tail)))
     return String.join(List.drop(&2, String, said, Nat.sub(List.length(&2, String, said), 8n)), "\n\n")
 
-# ---- the OpenRouter key: $OPENROUTER_API_KEY, else the Keychain item N owns ----
-def keychain_service() -> String:
-  "com.pedro.n.openrouter"
-
-def key_from(empty: Bool, e: String) -> IO(String):
-  match empty:
-    case True{}:
-      do IO<String>:
-        k : String <- run("security", ["find-generic-password", "-s", keychain_service(), "-w"], "", 5000)
-        return String.trim(k)
-    case False{}:
-      IO.pure(String, e)
+# ---- the OpenRouter key: the plugin's openrouter_api_key option, which Claude Code asks for when the
+# plugin is enabled, keeps in the platform's secure store, and hands to the hook ----
+def key_option() -> String:
+  "openrouter_api_key"
 
 def key() -> IO(String):
   do IO<String>:
-    +e : String <- env("OPENROUTER_API_KEY")
-    key_from(String.is_empty(String.trim(e)), String.trim(e))
+    k : String <- env("CLAUDE_PLUGIN_OPTION_OPENROUTER_API_KEY")
+    return String.trim(k)
 
 # ---- asking Jev ----
 def esc.go(cs: List<&2, Char>) -> List<&2, Char>:

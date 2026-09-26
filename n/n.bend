@@ -3,6 +3,8 @@ import bend-net-json@0.3.0.0/json.bend as Json
 import ./check.bend as C
 import ./effects.bend as E
 import ./type.bend as T
+import ../domain/architecture/system/release/plugin/type.bend as Pl
+import ../domain/architecture/system/release/plugin/ops.bend as PlO
 
 # N: a type checker for prompts. As a Claude Code hook it reads each prompt before the agent does: Jev
 # (Near's check) screens each phrase, and Claude runs N4's type error and lint check on what Jev flags,
@@ -16,8 +18,8 @@ import ./type.bend as T
 def model() -> String:
   "typesafe/jev-1.13"
 
-def version() -> String:
-  "0.2.0"
+def version() -> Pl.Version:
+  Pl.Version{0n, 3n, 0n}
 
 # ---- the hook ----
 # Jev screens every phrase; Claude runs N4's checker on what Jev flagged and gives each finding its one
@@ -100,10 +102,9 @@ def shown(ps: List<&2, C.Phrase>) -> String:
     case C.Phrase{T.Span{start, end}, t} <> rest:
       "\n  [" ++ Nat.show(start) ++ ", " ++ Nat.show(end) ++ ") \"" ++ t ++ "\"" ++ shown(rest)
 
-def key_source(+env: String, +k: String) -> String:
-  Bool.pick(String, Bool.not(String.is_empty(String.trim(env))), "found in $OPENROUTER_API_KEY",
-    Bool.pick(String, Bool.not(String.is_empty(k)), "found in the Keychain (" ++ E.keychain_service() ++ ")",
-      "missing: live checks would pass every prompt silently until $OPENROUTER_API_KEY or the Keychain item " ++ E.keychain_service() ++ " exists"))
+def key_source(+k: String) -> String:
+  Bool.pick(String, String.is_empty(k), "missing: the plugin's " ++ E.key_option() ++ " option is not set, so Claude checks every whole prompt",
+    "set by the plugin's " ++ E.key_option() ++ " option")
 
 def dryrun() -> IO(Unit):
   do IO<Unit>:
@@ -112,7 +113,6 @@ def dryrun() -> IO(Unit):
     +prompt : String = C.text(C.at(v, "prompt"))
     +ps : List<&2, C.Phrase> = C.phrases(prompt)
     +conversation : String <- E.conversation(C.text(C.at(v, "transcript_path")))
-    env : String <- E.env("OPENROUTER_API_KEY")
     k : String <- E.key()
     u : String <- E.env("N_CHECK_URL")
     IO.print("N dry run")
@@ -120,7 +120,7 @@ def dryrun() -> IO(Unit):
     IO.print("Skipped: " ++ Bool.show(skipped(prompt, inside)))
     IO.print("Phrases: " ++ Nat.show(List.length(&2, C.Phrase, ps)) ++ shown(ps))
     IO.print("Conversation: " ++ Nat.show(String.length(conversation)) ++ " characters")
-    IO.print("Key: " ++ key_source(env, k))
+    IO.print("Key: " ++ key_source(k))
     IO.print("Would POST to " ++ url(u) ++ ":")
     IO.print(Json.encode(C.request(model(), conversation, prompt, ps)))
     IO.print("Then, for what Jev flags (or everything, without Jev), would ask Claude:")
@@ -128,24 +128,15 @@ def dryrun() -> IO(Unit):
     IO.print("Nothing was sent.")
 
 # ---- the plugin ----
-def manifest() -> String:
-  Json.encode(C.obj([
-    ("name", C.str("n")),
-    ("version", C.str(version())),
-    ("description", C.str("N checks each prompt for phrases with more than one reading, and has Claude settle them before it acts.")),
-    ("author", C.obj([("name", C.str("Pedro Antonio Villanueva Juarez"))])),
-    ("repository", C.str("https://github.com/PedroAVJ/n")),
-    ("license", C.str("MIT"))]))
-
-def hooks() -> String:
-  Json.encode(C.obj([
-    ("description", C.str("N checks the prompt before Claude reads it.")),
-    ("hooks", C.obj([
-      ("UserPromptSubmit", Json.Arr{[C.obj([
-        ("hooks", Json.Arr{[C.obj([
-          ("type", C.str("command")),
-          ("command", C.str("\"${CLAUDE_PLUGIN_ROOT}/bin/n\" hook")),
-          ("timeout", Json.Num{"120"})])]})])]})]))]))
+def manifest() -> Pl.Manifest:
+  Pl.Manifest{"n", None{}, version(),
+    "N checks each prompt for phrases with more than one reading, and has Claude settle them before it acts.",
+    Pl.Author{"Pedro Antonio Villanueva Juarez", None{}, Some{"https://github.com/PedroAVJ"}},
+    None{}, Some{"https://github.com/PedroAVJ/n"}, Some{"MIT"}, ["type checker", "prompts", "ambiguity"], True{},
+    [Pl.Field{E.key_option(), "OpenRouter API key", "The key N uses to ask Jev, through OpenRouter, which phrases of a prompt are unclear.", True{},
+      Pl.Text{True{}, None{}}}],
+    [Pl.Hook{Pl.UserPromptSubmit{}, [Pl.Group{None{}, [
+      Pl.Command{Pl.Exec{"${CLAUDE_PLUGIN_ROOT}/bin/n", ["hook"]}, Pl.Blocking{}, None{}, Some{120n}, Some{"N is checking the prompt"}}]}]}]}
 
 def built(ok: Bool, +dir: String) -> IO(Unit):
   match ok:
@@ -157,9 +148,8 @@ def built(ok: Bool, +dir: String) -> IO(Unit):
 def plugin(+dir: String) -> IO(Unit):
   do IO<Unit>:
     +home : String <- E.env("HOME")
-    _ : Bool <- E.succeeds("mkdir", ["-p", dir ++ "/.claude-plugin", dir ++ "/hooks", dir ++ "/bin"], 5000)
-    E.write(dir ++ "/.claude-plugin/plugin.json", manifest() ++ "\n")
-    E.write(dir ++ "/hooks/hooks.json", hooks() ++ "\n")
+    _ : Bool <- E.succeeds("mkdir", ["-p", dir ++ "/.claude-plugin", dir ++ "/bin"], 5000)
+    E.write(dir ++ "/.claude-plugin/plugin.json", PlO.render(manifest()))
     ok : Bool <- E.succeeds(home ++ "/.bend/bin/bend", ["n/n.bend", "-o", dir ++ "/bin/n"], 600000)
     built(ok, dir)
 

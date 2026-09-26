@@ -1,6 +1,7 @@
 import Base
 import ../release/type.bend as Rl
 import ../release/ops.bend as RlO
+import ../release/plugin/ops.bend as PlO
 import ./type.bend as P
 
 def visibility(p: Bool) -> String:
@@ -58,14 +59,16 @@ def package_steps(ps: List<&2, Rl.Package>, hs: List<&2, P.Hub>) -> List<&2, P.S
 # ---- each plugin: released as it builds, new, or changed without a new version ----
 def plugin_step(g: Rl.Plugin, t: P.Tag) -> P.Step:
   match g t:
-    case Rl.Plugin{+n, +v, _, _, Rl.Repository{+r, _}} P.Tag{repo, tagged, +built, differs}:
+    case Rl.Plugin{+n, ver, _, _, Rl.Repository{+r, _}} P.Tag{repo, tagged, +built, valid, differs}:
+      +v = PlO.version_show(ver)
       +what = "plugin " ++ n ++ "@" ++ v
       Bool.pick(P.Step, String.is_empty(built), P.Blocked{what, "does not build"},
         Bool.pick(P.Step, Bool.not(String.eq(built, v)), P.Blocked{what, "builds as version " ++ built},
+        Bool.pick(P.Step, Bool.not(valid), P.Blocked{what, "claude plugin validate rejects the build"},
           Bool.pick(P.Step, Bool.not(repo), P.ReleasePlugin{n, v, r, True{}},
             Bool.pick(P.Step, Bool.not(tagged), P.ReleasePlugin{n, v, r, False{}},
               Bool.pick(P.Step, differs, P.Blocked{what, "changed since " ++ n ++ "-v" ++ v ++ " was released; give it a new version"},
-                P.Current{what})))))
+                P.Current{what}))))))
 
 def plugin_steps(gs: List<&2, Rl.Plugin>, ts: List<&2, P.Tag>) -> List<&2, P.Step>:
   match gs:

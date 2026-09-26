@@ -43,7 +43,7 @@ def system() -> S.System:
     D.Deployment{"", [], [], [D.Node{"machine", "Their machine", "macOS or Linux", D.Device{}, H.Other{}, D.Unmanaged{}, [], ["library"]}]},
     Rl.Release{Rl.Repository{"PedroAVJ/n", True{}},
       [Rl.Package{"near-v-framework", "0.4.0.0", "v.bend", ["rose", "compound", "architecture", "view", "plan"]}],
-      [Rl.Plugin{"n", "0.2.0", "n/n.bend", ["n"], Rl.Repository{"PedroAVJ/n-plugin", True{}}}]}}
+      [Rl.Plugin{"n", "0.2.0", "n/n.bend", ["n"], Rl.Repository{"PedroAVJ/near-plugins", True{}}}]}}
 
 def external(+k: String, +n: String, +d: String, c: C.Category, us: List<&2, Rel.Relationship>) -> X.External:
   X.External{k, n, d, c, [], [], [], us}

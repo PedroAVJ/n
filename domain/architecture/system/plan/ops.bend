@@ -64,7 +64,7 @@ def plugin_step(g: Rl.Plugin, t: P.Tag) -> P.Step:
         Bool.pick(P.Step, Bool.not(String.eq(built, v)), P.Blocked{what, "builds as version " ++ built},
           Bool.pick(P.Step, Bool.not(repo), P.ReleasePlugin{n, v, r, True{}},
             Bool.pick(P.Step, Bool.not(tagged), P.ReleasePlugin{n, v, r, False{}},
-              Bool.pick(P.Step, differs, P.Blocked{what, "changed since v" ++ v ++ " was released; give it a new version"},
+              Bool.pick(P.Step, differs, P.Blocked{what, "changed since " ++ n ++ "-v" ++ v ++ " was released; give it a new version"},
                 P.Current{what})))))
 
 def plugin_steps(gs: List<&2, Rl.Plugin>, ts: List<&2, P.Tag>) -> List<&2, P.Step>:
@@ -107,8 +107,8 @@ def show(s: P.Step) -> String:
       "publish  " ++ n ++ "@" ++ v
     case P.Push{r}:
       "push     github " ++ r
-    case P.ReleasePlugin{n, +v, r, create}:
-      "release  plugin " ++ n ++ "@" ++ v ++ " to github " ++ r ++ " as tag v" ++ v ++ Bool.pick(String, create, " (a new repository)", "")
+    case P.ReleasePlugin{+n, +v, r, create}:
+      "release  plugin " ++ n ++ "@" ++ v ++ " to marketplace github " ++ r ++ " as tag " ++ n ++ "-v" ++ v ++ Bool.pick(String, create, " (a new repository)", "")
     case P.Rebuild{h, _, _}:
       "rebuild  nix-darwin " ++ h
     case P.ServePort{p, t, _}:

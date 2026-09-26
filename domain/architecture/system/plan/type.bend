@@ -10,8 +10,8 @@ type Hub is Data:
 type Remote is Data:
   Remote{origin: String, visibility: String, clean: Bool, pushed: Bool}
 
-# What GitHub has for one declared plugin, next to a fresh build of it: whether its repository exists,
-# whether it is tagged v<version>, the version the build declares ("" when it did not build), and
+# What GitHub has for one declared plugin, next to a fresh build of it: whether its marketplace exists,
+# whether it is tagged <name>-v<version>, the version the build declares ("" when it did not build), and
 # whether the build differs from what the tag holds.
 type Tag is Data:
   Tag{repository: Bool, tagged: Bool, built: String, differs: Bool}
@@ -28,7 +28,7 @@ type Step is Data:
   Current{what: String}
   Publish{name: String, version: String, entry: String}
   Push{repository: String}
-  ReleasePlugin{name: String, version: String, repository: String, create: Bool}
+  ReleasePlugin{name: String, version: String, marketplace: String, create: Bool}
   Rebuild{host: String, flake: String, mac: String}
   ServePort{https: U32, target: String, tailscale: String}
   Change{what: String, now: String, want: String}

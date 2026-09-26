@@ -135,19 +135,20 @@ def remote(+root: String, r: Rl.Repository) -> IO(P.Remote):
         up : Bool <- pushed(root, first_word(head))
         return P.Remote{String.trim(origin), String.to_lower(String.trim(vis)), String.is_empty(String.trim(status)), up}
 
-# ---- a plugin: a fresh build of it, next to what GitHub has tagged for its version ----
-# Built under .git/v-plugin/<name>, never committed: build/ is what a release would hold, tag/ what
-# GitHub holds for the version.
+# ---- a plugin: a fresh build of it, next to what its marketplace has tagged for its version ----
+# Built under .git/v-plugin/<name>, never committed: build/ is what a release would hold at
+# plugins/<name>, tag/ is the marketplace at the tag, repo/ the marketplace a release writes.
 def plugin_dir(+root: String, +n: String) -> String:
   root ++ "/.git/v-plugin/" ++ n
 
+def tag_of(+n: String, +v: String) -> String:
+  n ++ "-v" ++ v
+
+def last_segment(xs: List<&2, String>) -> String:
+  Maybe.default(&2, String, List.last(&2, String, xs), "")
+
 def owner_of(+r: String) -> String:
   Maybe.default(&2, String, List.head(&2, String, String.split(r, '/')), "")
-
-# The plugin's repository is also its marketplace: one plugin, at its root.
-def marketplace(+n: String, +v: String, +r: String) -> String:
-  "{\"name\":\"" ++ n ++ "\",\"owner\":{\"name\":\"" ++ owner_of(r) ++ "\"},\"plugins\":[{\"name\":\"" ++ n ++
-  "\",\"source\":\"./\",\"version\":\"" ++ v ++ "\"}]}\n"
 
 def str_of(m: Maybe<&2, Json.Val>) -> String:
   match m:
@@ -163,13 +164,47 @@ def version_in(m: Maybe<&2, Json.Val>) -> String:
     case None{}:
       ""
 
-def build_plugin(+root: String, +bend: String, +n: String, +v: String, +e: String, +r: String) -> IO(String):
+def obj.go(kvs: List<&2, Sigma<&2, &2, String, _ => Json.Val>>, m: Map<&2, Json.Val>) -> Map<&2, Json.Val>:
+  match kvs:
+    case []:
+      m
+    case (k, v) <> rest:
+      obj.go(rest, Map.set(&2, Json.Val, m, k, v))
+
+def obj(kvs: List<&2, Sigma<&2, &2, String, _ => Json.Val>>) -> Json.Val:
+  Json.Obj{obj.go(kvs, Map.new(&2, Json.Val))}
+
+# The marketplace's other plugins, as listed now.
+def others(vs: List<&2, Json.Val>, +n: String) -> List<&2, Json.Val>:
+  match vs:
+    case []:
+      []
+    case +v <> rest:
+      +kept = others(rest, n)
+      Bool.pick(List<&2, Json.Val>, String.eq(str_of(Json.get(v, "name")), n), kept, v <> kept)
+
+def listed(m: Maybe<&2, Json.Val>) -> List<&2, Json.Val>:
+  match m:
+    case Some{Json.Arr{vs}}:
+      vs
+    case _:
+      []
+
+# The marketplace's listing with this plugin at this version, every other plugin as it was.
+def marketplace(+now: String, +n: String, +v: String, +r: String) -> String:
+  +m = Json.parse(now)
+  Json.encode(obj([
+    ("name", Json.Str{last_segment(String.split(r, '/'))}),
+    ("owner", obj([("name", Json.Str{owner_of(r)})])),
+    ("plugins", Json.Arr{List.append(&2, Json.Val, others(listed(Bool.pick(Maybe<&2, Json.Val>, Maybe.is_some(&2, Json.Val, m), Json.get(Maybe.default(&2, Json.Val, m, Json.Null{}), "plugins"), None{})), n),
+      [obj([("name", Json.Str{n}), ("source", Json.Str{"./plugins/" ++ n}), ("version", Json.Str{v})])])})])) ++ "\n"
+
+def build_plugin(+root: String, +bend: String, +n: String, +e: String) -> IO(String):
   do IO<String>:
     +build : String = plugin_dir(root, n) ++ "/build"
     _ : Bool <- X.succeeds("rm", ["-rf", plugin_dir(root, n)])
-    _ : Bool <- X.succeeds("mkdir", ["-p", build ++ "/.claude-plugin"])
+    _ : Bool <- X.succeeds("mkdir", ["-p", build])
     ok : Bool <- X.succeeds(bend, [root ++ "/" ++ e, "plugin", build])
-    X.write(build ++ "/.claude-plugin/marketplace.json", marketplace(n, v, r))
     manifest : String <- X.read(build ++ "/.claude-plugin/plugin.json")
     return Bool.pick(String, ok, version_in(Json.parse(manifest)), "")
 
@@ -179,17 +214,17 @@ def tag_differs(tagged: Bool, +root: String, +n: String, +v: String, +r: String)
       IO.pure(Bool, False{})
     case True{}:
       do IO<Bool>:
-        _ : Bool <- X.succeeds("git", ["clone", "-q", "--depth", "1", "--branch", "v" ++ v, "https://github.com/" ++ r, plugin_dir(root, n) ++ "/tag"])
-        same : Bool <- X.succeeds("diff", ["-rq", "-x", ".git", plugin_dir(root, n) ++ "/build", plugin_dir(root, n) ++ "/tag"])
+        _ : Bool <- X.succeeds("git", ["clone", "-q", "--depth", "1", "--branch", tag_of(n, v), "https://github.com/" ++ r, plugin_dir(root, n) ++ "/tag"])
+        same : Bool <- X.succeeds("diff", ["-rq", plugin_dir(root, n) ++ "/build", plugin_dir(root, n) ++ "/tag/plugins/" ++ n])
         return Bool.not(same)
 
 def tag_state(+home: String, +root: String, g: Rl.Plugin) -> IO(P.Tag):
   match g:
     case Rl.Plugin{+n, +v, +e, _, Rl.Repository{+r, _}}:
       do IO<P.Tag>:
-        built : String <- build_plugin(root, home ++ "/.bend/bin/bend", n, v, e, r)
+        built : String <- build_plugin(root, home ++ "/.bend/bin/bend", n, e)
         +repo : Bool <- X.succeeds("gh", ["repo", "view", r, "--json", "name"])
-        tags : String <- X.run("git", ["ls-remote", "--tags", "https://github.com/" ++ r, "refs/tags/v" ++ v])
+        tags : String <- X.run("git", ["ls-remote", "--tags", "https://github.com/" ++ r, "refs/tags/" ++ tag_of(n, v)])
         +tagged : Bool = repo && Bool.not(String.is_empty(String.trim(tags)))
         differs : Bool <- tag_differs(tagged, root, n, v, r)
         return P.Tag{repo, tagged, built, differs}
@@ -203,6 +238,22 @@ def tag_states(+home: String, +root: String, gs: List<&2, Rl.Plugin>) -> IO(List
         t : P.Tag <- tag_state(home, root, g)
         ts : List<&2, P.Tag> <- tag_states(home, root, rest)
         return t <> ts
+
+# A release: the build into plugins/<name>, the listing updated, committed, tagged and pushed.
+def release_plugin(+root: String, +n: String, +v: String, +r: String, create: Bool) -> IO(Bool):
+  do IO<Bool>:
+    +repo : String = plugin_dir(root, n) ++ "/repo"
+    _ : Bool <- Bool.pick(IO(Bool), create, X.succeeds("gh", ["repo", "create", r, "--public", "--description", "Claude Code plugins, built and released by V."]), IO.pure(Bool, True{}))
+    _ : Bool <- X.succeeds("rm", ["-rf", repo])
+    _ : Bool <- X.succeeds("git", ["clone", "-q", "https://github.com/" ++ r, repo])
+    _ : Bool <- X.succeeds("mkdir", ["-p", repo ++ "/plugins/" ++ n, repo ++ "/.claude-plugin"])
+    _ : Bool <- X.succeeds("rsync", ["-a", "--delete", plugin_dir(root, n) ++ "/build/", repo ++ "/plugins/" ++ n ++ "/"])
+    now : String <- X.read(repo ++ "/.claude-plugin/marketplace.json")
+    X.write(repo ++ "/.claude-plugin/marketplace.json", marketplace(now, n, v, r))
+    _ : Bool <- X.succeeds("git", ["-C", repo, "add", "-A"])
+    _ : Bool <- X.succeeds("git", ["-C", repo, "commit", "-q", "-m", n ++ " " ++ v])
+    _ : Bool <- X.succeeds("git", ["-C", repo, "tag", tag_of(n, v)])
+    X.succeeds("git", ["-C", repo, "push", "-q", "origin", "HEAD:main", tag_of(n, v)])
 
 # ---- a snapshot: everything a plan needs ----
 def root() -> IO(String):
@@ -238,14 +289,7 @@ def apply(+root: String, +bend: String, s: P.Step) -> IO(Unit):
         IO.print(Bool.pick(String, ok, "pushed   github " ++ r, "failed   push github " ++ r))
     case P.ReleasePlugin{+n, +v, +r, create}:
       do IO<Unit>:
-        +repo : String = plugin_dir(root, n) ++ "/repo"
-        _ : Bool <- Bool.pick(IO(Bool), create, X.succeeds("gh", ["repo", "create", r, "--public", "--description", "The " ++ n ++ " Claude Code plugin, built and released by V."]), IO.pure(Bool, True{}))
-        _ : Bool <- X.succeeds("git", ["clone", "-q", "https://github.com/" ++ r, repo])
-        _ : Bool <- X.succeeds("rsync", ["-a", "--delete", "--exclude", ".git", plugin_dir(root, n) ++ "/build/", repo ++ "/"])
-        _ : Bool <- X.succeeds("git", ["-C", repo, "add", "-A"])
-        _ : Bool <- X.succeeds("git", ["-C", repo, "commit", "-q", "-m", n ++ " " ++ v])
-        _ : Bool <- X.succeeds("git", ["-C", repo, "tag", "v" ++ v])
-        ok : Bool <- X.succeeds("git", ["-C", repo, "push", "-q", "origin", "HEAD:main", "v" ++ v])
+        ok : Bool <- release_plugin(root, n, v, r, create)
         IO.print(Bool.pick(String, ok, "released plugin " ++ n ++ "@" ++ v, "failed   release plugin " ++ n ++ "@" ++ v))
     case P.Rebuild{+h, +fl, +mac}:
       do IO<Unit>:

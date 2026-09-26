@@ -8,7 +8,7 @@ import ../lib/deploy.bend as D
 
 # ---- where it runs: whoever uses V, on their own computer ----
 def nodes() -> List<&2, A.Node>:
-  [A.Node{"machine", "Mac mini", A.UserDevice{}, A.Other{}}]
+  [A.Node{"machine", "Their machine", A.UserDevice{}, A.Other{}}]
 
 def org() -> A.Org:
   A.Org{"Pedro", A.Vendor{"Apple", "iCloud"}, []}
@@ -50,7 +50,7 @@ def image() -> A.Imagery:
 
 # Images for machines, programs and parts that have one of their own.
 def pictures() -> List<&2, A.Picture>:
-  [A.Picture{"machine", A.Icon{"mac-mini.png"}}]
+  []
 
 def owner() -> A.Party:
   A.Human{"Pedro", A.Photo{"https://avatars.githubusercontent.com/PedroAVJ?s=256"}}

@@ -336,6 +336,8 @@ def kind_name(k: A.ContainerKind) -> String:
       "cli"
     case A.Worker{}:
       "worker"
+    case A.Lib{}:
+      "library"
 
 def owner_name(o: A.Ownership) -> String:
   match o:
@@ -480,6 +482,8 @@ def program_type(k: A.ContainerKind) -> String:
       "CLI"
     case A.Worker{}:
       "Worker"
+    case A.Lib{}:
+      "Bend library"
 
 # every party is of type Party; with no picture of its own it is drawn as its kind
 def party_json(+p: A.Party, +channel: String) -> String:
@@ -567,7 +571,7 @@ def own_types(cs: List<&2, A.Container>) -> List<&2, String>:
           keep_new(Bool.not(A.is_ours(owner)), program_type(kind), own_types(rest))
 
 def ships_as(+s: A.System, library: Bool) -> String:
-  String.join(List.append(&2, String, List.reverse(&2, String, fresh(own_types(A.containers(s)), [], [])), keep_new(Bool.not(library), "Bend library", [])), ", ")
+  String.join(List.reverse(&2, String, fresh(List.append(&2, String, own_types(A.containers(s)), keep_new(Bool.not(library), "Bend library", [])), [], [])), ", ")
 
 # The graph as JSON: the system and its owner, tenants, machines, programs, parts and links, from its
 # one start (the proof rules out a system with several).

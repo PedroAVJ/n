@@ -61,6 +61,7 @@ type ContainerKind is Data:
   ModelApi{}
   Cli{}
   Worker{}
+  Lib{}
 
 # Whether the project builds and runs it, or uses it as it is.
 type Ownership is Data:
@@ -881,6 +882,8 @@ def container_emoji(k: ContainerKind) -> String:
       "⌨️"
     case Worker{}:
       "⚙️"
+    case Lib{}:
+      "📚"
 
 def lang_emoji(l: Lang) -> String:
   match l:

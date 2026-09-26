@@ -416,16 +416,53 @@ def system_type(k: A.SystemKind) -> String:
     case A.Library{}:
       "Library"
 
-def role_type(r: A.NodeRole) -> String:
+def node_type(r: A.NodeRole) -> String:
   match r:
     case A.UserDevice{}:
-      "User's device"
+      "Machine"
     case A.Server{}:
-      "Server"
+      "Machine"
     case A.Overlay{}:
-      "Private network"
+      "Network"
     case A.Outside{}:
-      "Internet"
+      "Network"
+
+def node_type_emoji(r: A.NodeRole) -> String:
+  match r:
+    case A.UserDevice{}:
+      "🖥️"
+    case A.Server{}:
+      "🖥️"
+    case A.Overlay{}:
+      "🛜"
+    case A.Outside{}:
+      "🛜"
+
+# a network with no picture of its own is drawn as what it is; a machine falls back to its type
+def node_image(r: A.NodeRole) -> A.Imagery:
+  match r:
+    case A.UserDevice{}:
+      A.Plain{}
+    case A.Server{}:
+      A.Plain{}
+    case A.Overlay{}:
+      A.Emoji{"🔒"}
+    case A.Outside{}:
+      A.Emoji{"🌐"}
+
+# an object's own image, or the given one when it has none
+def or_image(+i: A.Imagery, +d: A.Imagery) -> A.Imagery:
+  match i:
+    case A.Plain{}:
+      d
+    case A.Emoji{t}:
+      A.Emoji{t}
+    case A.Icon{u}:
+      A.Icon{u}
+    case A.Logo{u}:
+      A.Logo{u}
+    case A.Photo{u}:
+      A.Photo{u}
 
 def program_type(k: A.ContainerKind) -> String:
   match k:
@@ -444,16 +481,17 @@ def program_type(k: A.ContainerKind) -> String:
     case A.Worker{}:
       "Worker"
 
+# every party is of type Party; with no picture of its own it is drawn as its kind
 def party_json(+p: A.Party, +channel: String) -> String:
   match p:
     case A.Human{+name, image}:
-      entity(name, name, image, "Human", A.party_emoji(p), [prop("channel", channel)], "")
+      entity(name, name, or_image(image, A.Emoji{A.party_emoji(p)}), "Party", "👤", [prop("kind", "Human"), prop("channel", channel)], "")
     case A.Organization{+name, image, +k}:
-      entity(name, name, image, org_type(k), A.party_emoji(p), [prop("channel", channel)], "")
+      entity(name, name, or_image(image, A.Emoji{A.party_emoji(p)}), "Party", "👤", [prop("kind", org_type(k)), prop("channel", channel)], "")
     case A.Team{+name, image, of}:
-      entity(name, name, image, "Team", A.party_emoji(p), [prop("of", of), prop("channel", channel)], "")
+      entity(name, name, or_image(image, A.Emoji{A.party_emoji(p)}), "Party", "👤", [prop("kind", "Team"), prop("of", of), prop("channel", channel)], "")
     case A.Anyone{}:
-      entity("anyone", "Anyone", A.Plain{}, "Anyone", A.party_emoji(p), [prop("channel", channel)], "")
+      entity("anyone", "Anyone", A.Emoji{A.party_emoji(p)}, "Party", "👤", [prop("kind", "Anyone"), prop("channel", channel)], "")
 
 def uses_json(us: List<&2, A.Use>) -> List<&2, String>:
   match us:
@@ -487,7 +525,7 @@ def nodes_json(ns: List<&2, A.Node>, +pics: List<&2, A.Picture>) -> List<&2, Str
     case n <> rest:
       match n:
         case A.Node{+k, name, +role, host}:
-          entity(k, name, picture_of(k, pics), role_type(role), A.role_emoji(role), [prop("key", k), prop("host", host_name(host))], ",\"role\":" ++ jstr(role_name(role))) <> nodes_json(rest, pics)
+          entity(k, name, or_image(picture_of(k, pics), node_image(role)), node_type(role), node_type_emoji(role), [prop("key", k), prop("role", role_name(role)), prop("host", host_name(host))], ",\"role\":" ++ jstr(role_name(role))) <> nodes_json(rest, pics)
 
 def containers_json(cs: List<&2, A.Container>, +pics: List<&2, A.Picture>) -> List<&2, String>:
   match cs:

@@ -36,9 +36,26 @@ domain/
    └─ view/              C4's views (context, containers, components, deployment, dynamic), drawn with D2
 ```
 
-`v.bend` imports all of it. Effects run through
-[bend-kit-process](https://hub.bend-lang.com/n/bend-kit-process) and
-[bend-kit-files](https://hub.bend-lang.com/n/bend-kit-files); V has no foreign code of its own.
+`v.bend` imports all of it.
+
+## Effects
+
+Files go through [bend-kit-files](https://hub.bend-lang.com/n/bend-kit-files) and Base's File API.
+Running a program (git, gh, bend, d2) is V's one effect of its own:
+`domain/architecture/system/effs/program_run.c` and its twin `program_run.js`, one per Bend lane
+(`bend file.bend` runs the JS lane; `bend file.bend -o bin` builds the C lane). It runs a program
+with a list of arguments, never through a shell.
+
+It is temporary. [bend-kit-process](https://hub.bend-lang.com/n/bend-kit-process) does the same,
+but its only version, 0.1.0.0, runs on Bend 2.0.27 alone, while bend-kit-files needs 2.0.28 or later:
+
+| Bend   | bend-kit-process              | bend-kit-files     |
+|--------|-------------------------------|--------------------|
+| 2.0.27 | works                         | does not build     |
+| 2.0.28 | builds, fails when it runs    | works              |
+| 2.0.29 | does not build                | works              |
+
+When a bend-kit-process release runs on current Bend, V uses it and deletes `effs/`.
 
 ## A system
 

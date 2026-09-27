@@ -17,11 +17,24 @@ const file = (id: string) => join(folder, ...id.split('/')) + '.n';
 const under = (id: string) => id ? join(folder, ...id.split('/')) : folder;
 export const titleOf = (text: string, fallback: string) => text.match(/^#\s+(.+)$/m)?.[1].trim() || fallback;
 
-// The pages under a page (or the top pages), each with its title and how many pages are under it.
+// The order of the pages under a page (or of the top pages), as the author set it, in .order.json beside
+// them. Pages it does not name come after, by name.
+const orderFile = (parent: string) => join(under(parent), '.order.json');
+async function order(parent: string): Promise<string[]> { try { return JSON.parse(await readFile(orderFile(parent), 'utf8')); } catch { return []; } }
+export async function setOrder(parent: string, names: string[]) {
+  await mkdir(under(parent), { recursive: true });
+  await writeFile(orderFile(parent), JSON.stringify(names));
+}
+const pagesIn = async (id: string) => (await readdir(under(id)).catch(() => [] as string[])).filter(f => f.endsWith('.n')).map(f => f.slice(0, -2)).filter(nameOk).sort();
+
+// The pages under a page (or the top pages), in the author's order, each with its title and how many pages
+// are under it.
 export async function list(parent = '') {
   await mkdir(folder, { recursive: true });
-  const pagesIn = async (id: string) => (await readdir(under(id)).catch(() => [] as string[])).filter(f => f.endsWith('.n')).map(f => f.slice(0, -2)).filter(nameOk).sort();
-  return Promise.all((await pagesIn(parent)).map(async name => {
+  const [names, set] = await Promise.all([pagesIn(parent), order(parent)]);
+  const rank = (n: string) => { const i = set.indexOf(n); return i < 0 ? set.length : i; };
+  const sorted = names.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+  return Promise.all(sorted.map(async name => {
     const id = parent ? `${parent}/${name}` : name;
     return { id, name, title: titleOf(await readFile(file(id), 'utf8'), name), pages: (await pagesIn(id)).length };
   }));
@@ -42,7 +55,10 @@ export async function save(id: string, text: string) {
 export async function create(id: string) {
   if (parentOf(id) && (await read(parentOf(id))) === null) throw Error('No such page to put it under');
   await mkdir(dirname(file(id)), { recursive: true });
-  try { await access(file(id)); } catch { await writeFile(file(id), `# ${nameOf(id)}\n\n`, 'utf8'); }
+  try { await access(file(id)); } catch {
+    await writeFile(file(id), `# ${nameOf(id)}\n\n`, 'utf8');
+    const set = await order(parentOf(id)); if (set.length) await setOrder(parentOf(id), [...set, nameOf(id)]);
+  }
 }
 
 // Renaming moves the page and the pages under it, and answers its new id; its check, intents and drafts
@@ -53,5 +69,6 @@ export async function rename(id: string, name: string) {
   if (taken && id.toLowerCase() !== to.toLowerCase()) throw Error(`${name}.n already exists here`);
   await move(file(id), file(to));
   await move(under(id), under(to)).catch(() => {});
+  const set = await order(parentOf(id)); if (set.includes(nameOf(id))) await setOrder(parentOf(id), set.map(n => n === nameOf(id) ? name : n));
   return to;
 }

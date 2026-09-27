@@ -9,6 +9,8 @@ export const CopyIcon = svg(<><rect x="6.75" y="6.75" width="10" height="10" rx=
 export const PlusIcon = svg(<path d="M10 4.5v11M4.5 10h11" />);
 export const CloseIcon = svg(<path d="M5.5 5.5l9 9M14.5 5.5l-9 9" />);
 export const TickIcon = svg(<path d="M4.5 10.5l3.5 3.5 7.5-8" />);
+export const UpIcon = svg(<path d="M5.5 12l4.5-4.5 4.5 4.5" />);
+export const DownIcon = svg(<path d="M5.5 8l4.5 4.5L14.5 8" />);
 export const ChevronIcon = svg(<path d="M8 5.5l4.5 4.5L8 14.5" />);
 export function Spinner({ className = 'size-4' }: P) {
   return <span aria-hidden className={`${className} inline-block animate-spin rounded-full border-2 border-current border-t-transparent`} />;

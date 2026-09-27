@@ -1,5 +1,5 @@
 import { tree } from '@/lib/documents';
-import { PageTree } from '@/components/page-list';
+import { Pages } from '@/components/page-list';
 import { NewDocument } from './new-document';
 export const dynamic = 'force-dynamic';
 
@@ -15,8 +15,7 @@ export default async function Documents() {
       </div>
     </header>
     <nav aria-label="Pages" className="flex flex-col">
-      <PageTree pages={pages} />
-      <NewDocument />
+      <Pages parent="" pages={pages} footer={<NewDocument />} />
     </nav>
   </main>;
 }

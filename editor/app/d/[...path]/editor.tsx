@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { ChevronIcon } from '@/components/icons';
-import { PageRows } from '@/components/page-list';
+import { Pages } from '@/components/page-list';
 import { Writer } from '@/components/writer';
 import { ancestors, href, nameOf, segments } from '@/lib/pages';
 import { NewDocument } from '../../new-document';
@@ -11,8 +11,8 @@ import { NewDocument } from '../../new-document';
 const titleOf = (text: string, fallback: string) => text.match(/^#\s+(.+)$/m)?.[1].trim() || fallback;
 type Sub = { id: string; name: string; title: string; pages: number };
 
-// One page: the pages above it, its title and name (renamed here), the pages under it and a new one, and
-// its text, written and checked by N (see Writer).
+// One page: the pages above it, its title and name (renamed here), its text, written and checked by N (see
+// Writer), and after it the pages under it, in the author's order, and a new one.
 export function Editor({ id, initial, pages }: { id: string; initial: string; pages: Sub[] }) {
   const router = useRouter(); const name = nameOf(id);
   const [text, setText] = useState(initial);
@@ -43,11 +43,9 @@ export function Editor({ id, initial, pages }: { id: string; initial: string; pa
         {problem && <p role="alert" className="w-full text-sm text-error">{problem}</p>}
       </div> : <button onClick={() => setRenaming(true)} className="self-start rounded-md text-sm text-faint hover:text-muted">{name}.n</button>}
     </header>
-    <section aria-label="Pages under this one" className="mt-5 flex flex-col">
-      <PageRows pages={pages} />
-      <NewDocument parent={id} />
+    <div className="mt-8"><Writer id={id} initial={initial} commit={commit} onText={setText} /></div>
+    <section aria-label="Pages under this one" className="mt-10 flex flex-col border-t border-line pt-4">
+      <Pages parent={id} pages={pages.map(({ id, name, title }) => ({ id, name, title }))} footer={<NewDocument parent={id} />} />
     </section>
-    <div className="my-6 h-px bg-line" />
-    <Writer id={id} initial={initial} commit={commit} onText={setText} />
   </main>;
 }

@@ -1,13 +1,29 @@
 import Link from 'next/link';
 import { href } from '@/lib/pages';
+import { PageIcon } from './icons';
 
-// Pages as links: each one's title, name, and how many pages are under it.
-export function PageList({ pages }: { pages: Array<{ id: string; name: string; title: string; pages: number }> }) {
+type Row = { id: string; name: string; title: string };
+type Node = Row & { pages: Node[] };
+
+// Pages as rows, the way a notebook lists them: an icon, the title, and the pages under each, indented.
+export function PageTree({ pages, depth = 0 }: { pages: Node[]; depth?: number }) {
   if (!pages.length) return null;
-  return <div className="flex flex-col gap-2">
-    {pages.map(p => <Link key={p.id} href={href(p.id)} className="flex items-baseline justify-between gap-3 rounded-lg border border-stone-200 p-3 hover:border-orange-700 dark:border-zinc-800 dark:hover:border-orange-500">
-      <span className="flex flex-col gap-0.5"><span className="font-semibold">{p.title}</span><span className="text-sm text-stone-500 dark:text-zinc-400">{p.name}.n</span></span>
-      {p.pages > 0 && <span className="text-sm text-stone-500 dark:text-zinc-400">{p.pages} page{p.pages === 1 ? '' : 's'}</span>}
-    </Link>)}
-  </div>;
+  return <ul className={depth ? 'ml-4 border-l border-line pl-2' : ''}>
+    {pages.map(p => <li key={p.id}>
+      <PageRow page={p} />
+      <PageTree pages={p.pages} depth={depth + 1} />
+    </li>)}
+  </ul>;
+}
+
+export function PageRows({ pages }: { pages: Row[] }) {
+  if (!pages.length) return null;
+  return <ul>{pages.map(p => <li key={p.id}><PageRow page={p} /></li>)}</ul>;
+}
+
+function PageRow({ page }: { page: Row }) {
+  return <Link href={href(page.id)} className="group flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-[15px] text-ink hover:bg-hover">
+    <PageIcon className="size-[18px] shrink-0 text-faint group-hover:text-muted" />
+    <span className="truncate">{page.title}</span>
+  </Link>;
 }

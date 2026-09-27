@@ -1,10 +1,11 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { CopyIcon, MicIcon, Spinner, TickIcon } from './icons';
 import type { Result } from '@/lib/checks';
 import { segments } from '@/lib/pages';
 import { useDictation } from './dictation';
-import { place, Squiggles, type Placed } from './findings';
+import { FindingSheet, keyOf, place, Squiggles, type Placed } from './findings';
 
 // A .n document, written and checked by N. Check saves the text and has N compile it in the background:
 // the type check, lint and format, every fix N is sure of applied, and what is left marked in View mode as
@@ -90,31 +91,53 @@ export function Writer({ id, initial, commit, onText }: Props) {
   const shown = place(text, found);
   const apply = (f: Placed, choice: string) => setText(text.slice(0, f.start) + choice + text.slice(f.end));
   const errors = shown.filter(f => f.error).length, warnings = shown.length - errors;
-  const verdict = !check ? null
-    : check.status === 'running' ? { tone: 'bg-stone-200 text-stone-700 dark:bg-zinc-800 dark:text-zinc-300', label: 'N is checking in the background: you can leave this page', spin: true }
-    : check.status === 'failed' ? { tone: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300', label: `N failed: ${check.error}`, spin: false }
-    : !shown.length ? { tone: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300', label: `✓ Compiles${check.fixed ? ` · fixed ${check.fixed}` : ''}`, spin: false }
-    : { tone: errors ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300' : 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300', label: `${errors} error${errors === 1 ? '' : 's'}, ${warnings} warning${warnings === 1 ? '' : 's'}${check.fixed ? ` · fixed ${check.fixed}` : ''}`, spin: false };
-  const stale = check?.status === 'done' && text !== check.text && text === base ? 'Edited since this check' : '';
+  const [open, setOpen] = useState<string | null>(null);
+  const chosen = shown.find(f => keyOf(f) === open);
+  const [copied, setCopied] = useState(false);
+  const copy = async () => { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); };
+  // The text box grows with the text, so the page scrolls instead of the box.
+  useEffect(() => { const a = area.current; if (!a) return; a.style.height = 'auto'; a.style.height = `${a.scrollHeight}px`; }, [text, mode]);
 
-  return <div className="flex flex-col gap-3">
-    <div role="tablist" aria-label="Mode" className="flex gap-1 self-start rounded-lg border border-stone-200 p-1 dark:border-zinc-800">
-      {(['edit', 'view'] as const).map(m => <button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)}
-        className={`rounded-md px-3 py-1 text-sm ${mode === m ? 'bg-stone-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : 'text-stone-600 dark:text-zinc-400'}`}>{m === 'edit' ? 'Edit' : 'View'}</button>)}
-    </div>
+  // Where N stands: checking, failed, passing, or how many errors and warnings are left.
+  const verdict = !check ? null
+    : check.status === 'running' ? <span className="flex items-center gap-2 text-muted"><Spinner className="size-3.5" />Checking in the background: you can leave</span>
+    : check.status === 'failed' ? <span className="truncate text-error">N failed: {check.error}</span>
+    : !shown.length ? <span className="flex items-center gap-1.5 text-ok"><TickIcon className="size-4" />Compiles{check.fixed ? <span className="text-muted"> · {check.fixed} fixed</span> : null}</span>
+    : <button onClick={() => { setMode('view'); setOpen(keyOf(shown[0])); }} className="flex items-center gap-3">
+        {errors > 0 && <span className="flex items-center gap-1.5 text-error"><span className="size-2 rounded-full bg-current" />{errors} error{errors === 1 ? '' : 's'}</span>}
+        {warnings > 0 && <span className="flex items-center gap-1.5 text-warning"><span className="size-2 rounded-full bg-current" />{warnings} warning{warnings === 1 ? '' : 's'}</span>}
+        {check.fixed ? <span className="text-muted">{check.fixed} fixed</span> : null}
+      </button>;
+  const stale = check?.status === 'done' && text !== check.text && text === base ? 'Edited since this check' : '';
+  const note = [status, stale].filter(Boolean).join(' · ');
+  const prose = 'font-serif text-[18px] leading-[1.75] sm:text-[19px]';
+
+  return <div className="flex flex-col">
     {mode === 'edit' ? <>
       <label htmlFor="writer" className="sr-only">Text</label>
-      <textarea id="writer" ref={area} value={text} spellCheck onChange={e => { setText(e.target.value); setStatus(''); }}
-        className="h-[70vh] w-full resize-y rounded-lg border border-stone-200 bg-transparent p-4 font-mono text-[15px] leading-relaxed outline-none focus:border-orange-700 dark:border-zinc-800" />
-    </> : <Squiggles text={text} shown={shown} id={id} apply={apply} intents={intents} />}
-    <div className="flex flex-wrap items-center gap-2">
-      <Button onClick={compile} disabled={busy || check?.status === 'running'} className="rounded-md bg-stone-900 px-4 py-2 text-white hover:bg-orange-700 dark:bg-zinc-100 dark:text-zinc-900">Check</Button>
-      <Button onClick={() => save()} disabled={busy} className="rounded-md border border-stone-300 px-4 py-2 hover:border-orange-700 dark:border-zinc-700">Save</Button>
-      <Button onClick={toggle} aria-pressed={listening} className={`rounded-md border px-4 py-2 ${listening ? 'border-orange-700 bg-orange-700 text-white' : 'border-stone-300 hover:border-orange-700 dark:border-zinc-700'}`}>{listening ? 'Stop' : 'Dictate'}</Button>
-      <Button onClick={() => navigator.clipboard.writeText(text)} className="rounded-md border border-stone-300 px-4 py-2 hover:border-orange-700 dark:border-zinc-700">Copy</Button>
-      {verdict && <span role="status" aria-live="polite" className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${verdict.tone}`}>
-        {verdict.spin && <span aria-hidden className="size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />}{verdict.label}</span>}
-      <span className="text-sm text-stone-500 dark:text-zinc-400">{[text !== base ? 'Unsaved' : '', stale, status].filter(Boolean).join(' · ')}</span>
+      <textarea id="writer" ref={area} value={text} spellCheck placeholder="Start writing, or dictate…" onChange={e => { setText(e.target.value); setStatus(''); }}
+        className={`${prose} min-h-[40dvh] w-full resize-none overflow-hidden bg-transparent outline-none placeholder:text-faint`} />
+    </> : <Squiggles text={text} shown={shown} open={open} choose={setOpen} className={`${prose} min-h-[40dvh]`} />}
+
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-20 flex flex-col gap-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      {chosen ? <FindingSheet key={open ?? ''} f={chosen} text={text} id={id} apply={(f, c) => { apply(f, c); setOpen(null); }} kept={intents[chosen.quote]} close={() => setOpen(null)} />
+      : <div className="pointer-events-auto mx-3 flex flex-col gap-1.5 rounded-2xl border border-line bg-surface/90 p-2 shadow-lg backdrop-blur-md sm:mx-auto sm:w-full sm:max-w-[680px]">
+        {(verdict || note || text !== base) && <div role="status" aria-live="polite" className="flex min-h-6 items-center justify-between gap-3 px-2 text-sm">
+          <span className="min-w-0 truncate">{verdict}</span>
+          <span className="shrink-0 text-faint">{note || (text !== base ? 'Unsaved' : '')}</span>
+        </div>}
+        <div className="flex items-center gap-1.5">
+          <div role="tablist" aria-label="Mode" className="flex rounded-full bg-hover p-0.5">
+            {(['edit', 'view'] as const).map(m => <button key={m} role="tab" aria-selected={mode === m} onClick={() => { setMode(m); setOpen(null); }}
+              className={`h-9 rounded-full px-3.5 text-sm font-medium transition-colors ${mode === m ? 'bg-surface text-ink shadow-sm' : 'text-muted'}`}>{m === 'edit' ? 'Edit' : 'View'}</button>)}
+          </div>
+          <div className="flex-1" />
+          {text !== base && <Button variant="quiet" size="small" onClick={() => save()} disabled={busy}>Save</Button>}
+          <Button variant="quiet" size="icon" onClick={toggle} aria-pressed={listening} aria-label={listening ? 'Stop dictating' : 'Dictate'} className={listening ? 'bg-error text-white hover:bg-error' : 'text-muted'}><MicIcon /></Button>
+          <Button variant="quiet" size="icon" onClick={copy} aria-label="Copy the text" className="text-muted">{copied ? <TickIcon /> : <CopyIcon />}</Button>
+          <Button onClick={compile} disabled={busy || check?.status === 'running'}>{check?.status === 'running' ? <Spinner /> : null}Check</Button>
+        </div>
+      </div>}
     </div>
   </div>;
 }

@@ -26,6 +26,11 @@ export async function list(parent = '') {
     return { id, name, title: titleOf(await readFile(file(id), 'utf8'), name), pages: (await pagesIn(id)).length };
   }));
 }
+// Every page, as a tree: the top pages, each with the pages under it.
+export type Node = { id: string; name: string; title: string; pages: Node[] };
+export async function tree(parent = '', depth = 0): Promise<Node[]> {
+  return Promise.all((await list(parent)).map(async p => ({ id: p.id, name: p.name, title: p.title, pages: p.pages && depth < 8 ? await tree(p.id, depth + 1) : [] })));
+}
 export async function read(id: string) {
   try { return await readFile(file(id), 'utf8'); } catch { return null; }
 }

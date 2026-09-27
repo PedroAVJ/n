@@ -1,1 +1,25 @@
 @import "tailwindcss";
+
+/* N's look: warm paper and ink, one blue accent, red for errors, amber for warnings, green for a pass.
+   Text is set in Newsreader, everything around it in Inter. Dark follows the device. */
+:root {
+  --paper: #fbfaf8; --surface: #ffffff; --ink: #1f1e1c; --muted: #6f6b66; --faint: #a39e97; --line: #e9e6e1; --hover: #f3f1ed;
+  --accent: #3656d6; --accent-ink: #ffffff; --error: #d23c3c; --warning: #c9771c; --ok: #2e8b57;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #151514; --surface: #1c1c1a; --ink: #ecebe7; --muted: #a29d96; --faint: #6d6862; --line: #2b2a27; --hover: #242321;
+    --accent: #8ba0f7; --accent-ink: #10131f; --error: #f07272; --warning: #efa655; --ok: #6fcf97;
+  }
+}
+@theme inline {
+  --color-paper: var(--paper); --color-surface: var(--surface); --color-ink: var(--ink); --color-muted: var(--muted);
+  --color-faint: var(--faint); --color-line: var(--line); --color-hover: var(--hover); --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink); --color-error: var(--error); --color-warning: var(--warning); --color-ok: var(--ok);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-newsreader), ui-serif, Georgia, serif;
+}
+html { -webkit-text-size-adjust: 100%; }
+body { background: var(--paper); color: var(--ink); }
+::selection { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+textarea { field-sizing: content; }

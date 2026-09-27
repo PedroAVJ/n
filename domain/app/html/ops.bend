@@ -37,9 +37,14 @@ def lower(hs: List<&2, H.Html>) -> List<&2, M.Node>:
       M.Element{"div", [M.Attribute{"id", id}, M.Attribute{"aria-live", "polite"}, cls(s)], lower(cs)} <> lower(rest)
     case H.Button{id, label, ds, s} <> rest:
       M.Element{"button", M.Attribute{"type", "button"} <> M.Attribute{"id", id} <> cls(s) <> data(ds), [M.Text{label}]} <> lower(rest)
-    case H.TextArea{+id, label, placeholder, s} <> rest:
+    case H.TextArea{+id, label, placeholder, value, s} <> rest:
       M.Element{"label", [M.Attribute{"for", id}, M.Attribute{"class", "visually-hidden"}], [M.Text{label}]} <>
-      M.Element{"textarea", [M.Attribute{"id", id}, M.Attribute{"placeholder", placeholder}, cls(s)], []} <> lower(rest)
+      M.Element{"textarea", [M.Attribute{"id", id}, M.Attribute{"placeholder", placeholder}, M.Attribute{"spellcheck", "true"}, cls(s)], [M.Text{value}]} <> lower(rest)
+    case H.Field{+id, label, placeholder, s} <> rest:
+      M.Element{"label", [M.Attribute{"for", id}, M.Attribute{"class", "visually-hidden"}], [M.Text{label}]} <>
+      M.Void{"input", [M.Attribute{"id", id}, M.Attribute{"type", "text"}, M.Attribute{"placeholder", placeholder}, cls(s)]} <> lower(rest)
+    case H.Link{href, s, cs} <> rest:
+      M.Element{"a", [M.Attribute{"href", href}, cls(s)], lower(cs)} <> lower(rest)
 
 # Every style the elements use, in order.
 def styles(hs: List<&2, H.Html>) -> List<&2, S.Style>:
@@ -62,8 +67,12 @@ def styles(hs: List<&2, H.Html>) -> List<&2, S.Style>:
       s <> List.append(&2, S.Style, styles(cs), styles(rest))
     case H.Button{_, _, _, s} <> rest:
       s <> styles(rest)
-    case H.TextArea{_, _, _, s} <> rest:
+    case H.TextArea{_, _, _, _, s} <> rest:
       s <> styles(rest)
+    case H.Field{_, _, _, s} <> rest:
+      s <> styles(rest)
+    case H.Link{_, s, cs} <> rest:
+      s <> List.append(&2, S.Style, styles(cs), styles(rest))
 
 # A fragment: elements printed on their own, for a region the page replaces.
 def fragment(+hs: List<&2, H.Html>) -> String:

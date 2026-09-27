@@ -32,17 +32,32 @@ export function Writer({ draft, initial, commit, label, clears, rows = 'h-[60vh]
   const area = useRef<HTMLTextAreaElement>(null); const mirror = useRef<HTMLDivElement>(null);
   const latest = useRef(text); latest.current = text;
   useEffect(() => { onText?.(text); }, [text, onText]);
-  // An unsent or unsaved draft outlives a reload, in this browser, until it is sent or saved; text typed
-  // before the page came alive is kept too.
-  const key = `n-draft:${draft}`;
+  // An unsent or unsaved draft is kept on the Mac mini until it is sent or saved, so it outlives a reload
+  // and is the same in Safari and the Home Screen app. Text typed before the page came alive is kept too.
+  const store = `/api/draft/${encodeURIComponent(draft)}`;
+  const loaded = useRef(false);
   useEffect(() => {
-    let kept: string | null = null;
-    try { kept = localStorage.getItem(key); } catch {}
-    const typed = area.current?.value ?? '';
-    if (typed && typed !== initial) setText(typed); else if (kept !== null && kept !== initial) setText(kept);
+    loaded.current = false;
+    (async () => {
+      let kept: string | null = null;
+      try { const r = await fetch(store, { cache: 'no-store' }); if (r.ok) kept = (await r.json() as { text: string | null }).text; } catch {}
+      const typed = area.current?.value ?? '';
+      if (typed && typed !== initial) setText(typed); else if (kept !== null && kept !== initial) setText(kept);
+      loaded.current = true;
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
-  useEffect(() => { try { if (text === (clears ? '' : base)) localStorage.removeItem(key); else localStorage.setItem(key, text); } catch {} }, [text, base, key, clears]);
+  }, [store]);
+  const idle = text === (clears ? '' : base);
+  useEffect(() => {
+    if (!loaded.current) return;
+    const timer = setTimeout(() => { void fetch(store, idle ? { method: 'DELETE' } : { method: 'PUT', body: text }).catch(() => {}); }, 400);
+    return () => clearTimeout(timer);
+  }, [text, idle, store]);
+  useEffect(() => {
+    const leave = () => { if (loaded.current && !idle) navigator.sendBeacon(store, text); };
+    window.addEventListener('pagehide', leave);
+    return () => window.removeEventListener('pagehide', leave);
+  }, [text, idle, store]);
 
   const read = (v: string, r: Review, jev = false) => r.marks.map(m => ({ ...m, quote: v.slice(m.start, m.end), jev }));
   const byN = useRef(false);

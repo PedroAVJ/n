@@ -72,6 +72,7 @@ export async function review(p: Edited, state: State) {
     const outcome = await answer(p.url, found.map(x => x.f));
     if (outcome.signedOut) throw new SignedOut('N\'s browser is signed out of Notion');
     for (const i of outcome.done) if (found[i - 1]) state.flagged[found[i - 1].key] = true;
+    for (const [i, x] of found.entries()) log(`  ${outcome.done.includes(i + 1) ? 'answered' : 'missed  '} ${x.f.kind} "${x.f.quote}"`);
     log(`"${p.title}": ${found.length} findings to answer, ${outcome.done.length} answered`);
   }
   for (const b of all) state.blocks[b.id] = hash(b.text);

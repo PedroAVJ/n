@@ -38,6 +38,7 @@ function prompt(url: string, findings: Finding[]): string {
     'A SUGGEST is a suggested edit: first turn on Suggest edits (the page\'s ••• menu at the top right, then Suggest edits), then select exactly the quote and type the rewrite over it (or press Backspace to delete it), so Notion records it as a suggestion Pedro can accept or reject. Do all comments before turning on Suggest edits.',
     'Each block is the element with data-block-id equal to its id. To select exactly the quote you may set the DOM selection with a script over the text of that block\'s contenteditable element.',
     'Change nothing else on the page. Only type once the comment box or the selection is where it must be; if anything lands in the wrong place, undo it (Cmd+Z) until the page is as it was. Check each result on the page before counting it done.',
+    'If the block already has a comment or suggested edit (from N, starting "N:", or Pedro\'s own) about the same thing, add nothing for that finding and count it done.',
     'If Notion asks to sign in, do nothing and answer {"signedOut": true, "done": []}.',
     '',
     'Findings:',

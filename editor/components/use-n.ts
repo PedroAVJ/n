@@ -47,6 +47,5 @@ export function useN(text: string) {
     finally { setChecking(false); setBusy(false); }
   };
   const forget = (f: Found) => setFound(fs => fs.filter(x => x.quote !== f.quote || x.start !== f.start));
-  const reset = () => { setFound([]); setAnswered({ text: '', count: 0, error: '' }); };
-  return { shown, phase, forget, reset, check, busy };
+  return { shown, phase, forget, check, busy };
 }

@@ -4,14 +4,13 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { query, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 
-// N's checks. The screen is N's binary asking Jev which phrases are unclear. N check is N's whole-document
-// checker prompt, answered by Claude Opus on the owner's Claude subscription through one warm Agent SDK
-// session, and read back into marks by N's binary.
+// N check: N's whole-document checker prompt (the type check, lint and format N.n defines), answered by
+// Claude Opus on the owner's Claude subscription through one warm Agent SDK session, and read back into
+// marks by N's binary.
 export type Mark = { start: number; end: number; level: string; why: string; question: string; fixable: boolean; new: string; options: string[] };
 export type Review = { marks: Mark[]; assessor: string; seconds: number };
 
 const binary = process.env.N_BIN || join(homedir(), 'Library/Application Support/N/bin/n');
-const keychainItem = process.env.N_KEYCHAIN || '';
 
 function runN(args: string[], input: unknown): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -70,12 +69,6 @@ function claude(prompt: string): Promise<string> {
   });
   turn = answer.catch(() => {});
   return answer;
-}
-
-export async function screen(text: string): Promise<Review> {
-  const started = Date.now();
-  const r = JSON.parse(await runN(['screen', keychainItem], { text, conversation: '' })) as { marks: Mark[]; assessor: string };
-  return { marks: inUnits(text, r.marks), assessor: r.assessor, seconds: (Date.now() - started) / 1000 };
 }
 
 // A check that has not answered in two minutes has failed; the session is replaced for the next one.

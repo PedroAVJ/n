@@ -41,28 +41,14 @@ def library() -> Ct.Container:
       Co.Component{"n", "N", "A type checker for prompts: flags each phrase with more than one reading before an agent acts on it.", Co.Bend{},
         [uses("openrouter", "Asks Jev which phrases are unclear through", "HTTPS"), uses("claude", "Checks each prompt as a hook of", "UserPromptSubmit")]} ], []}
 
-# N's editor: where Pedro writes, checked as he writes: WhatsApp replies against their chat, Notion pages,
-# and .n documents. A Next.js app in editor/, checking through N's binary; served from Pedro's Mac mini.
+# N's editor: where .n documents are written and checked by N. A Next.js app in editor/, checking through
+# N's binary; served from Pedro's Mac mini.
 def editor() -> Ct.Container:
-  Ct.Container{"editor", "N editor", "Where WhatsApp replies, Notion pages and .n documents are written until each says exactly one thing: Jev screens them as they are typed, Claude gives the readings.",
+  Ct.Container{"editor", "N editor", "Where .n documents are written and checked: Check runs N's type check, lint and format, makes the fixes N is sure of, and leaves the rest to choose.",
     C.Client{}, Ct.Ours{}, Ct.Tailnet{}, [C.Hosting{}], "editor", [], ["Next.js", "Tailwind CSS"], ["React", "markdown-it", "Claude Agent SDK"], ["TypeScript", "JavaScript"], [], [],
-    [uses("library", "Checks documents with N's binary", "n screen, n prompt, n read"),
-     uses("openrouter", "Screens documents with Jev through", "HTTPS"),
+    [uses("library", "Checks documents with N's binary", "n prompt, n read"),
      uses("claude", "Checks documents with", "Agent SDK"),
-     uses("elevenlabs", "Transcribes dictation with Scribe through", "the elevenlabs CLI"),
-     uses("whatsapp", "Reads chats and sends replies through", "the whatsapp CLI"),
-     uses("notion-api", "Reads and saves pages through", "REST with ntn")]}
-
-# N on Notion: checks Pedro's Notion pages as they are written. It finds edited pages and reads them through
-# Notion's REST API; an agent answers on its website, the only API that anchors a comment to a phrase or
-# suggests an edit, and one made for a person or an agent, not a script.
-def notion() -> Ct.Container:
-  Ct.Container{"notion", "N on Notion", "Checks Notion pages as they are written: a suggested edit where one rewrite keeps the meaning, a comment on the phrase where it has more than one reading.",
-    C.Worker{}, Ct.Ours{}, Ct.Local{}, [], "notion", [], [], ["Claude Agent SDK", "Playwright MCP"], ["TypeScript"], [], [],
-    [uses("editor", "Checks pages with", "HTTP /api/check"),
-     uses("notion-api", "Finds and reads edited pages through", "REST with ntn"),
-     uses("claude", "Has an agent answer findings with", "Agent SDK"),
-     uses("notion-api", "Suggests edits and comments on phrases through", "its website, an agent in Chrome as Pedro")]}
+     uses("elevenlabs", "Transcribes dictation with Scribe through", "the elevenlabs CLI")]}
 
 def browser() -> Ct.Container:
   Ct.Container{"browser", "Safari", "The iPhone's browser.", C.Client{}, Ct.Theirs{}, Ct.Device{}, [], "", ["Apple"], [], [], [], [], [],
@@ -79,28 +65,18 @@ def n_bin() -> String:
 def editor_dir() -> String:
   home() ++ "/Library/Application Support/N/editor"
 
-def notion_dir() -> String:
-  home() ++ "/Library/Application Support/N/notion"
-
 def mac_mini() -> D.Node:
   D.Node{"mac-mini", "Mac mini", "macOS", D.Server{}, H.Owned{"mac-mini"},
     D.Launchd{Ld.Launchd{
-      [Ld.Program{n_bin(), Ld.Bend{"n/n.bend"}}, Ld.Program{editor_dir(), Ld.Next{"editor"}}, Ld.Program{notion_dir(), Ld.Node{"notion"}}],
+      [Ld.Program{n_bin(), Ld.Bend{"n/n.bend"}}, Ld.Program{editor_dir(), Ld.Next{"editor"}}],
       [Ld.Agent{"editor", "com.pedro.n-editor", "/run/current-system/sw/bin/node", [editor_dir() ++ "/server.js"],
         [Ld.Variable{"PORT", "4610"}, Ld.Variable{"HOSTNAME", "127.0.0.1"}, Ld.Variable{"N_BIN", n_bin()},
          Ld.Variable{"ELEVENLABS_BIN", home() ++ "/.local/bin/elevenlabs"},
-         Ld.Variable{"PATH", "/Library/Frameworks/Python.framework/Versions/3.14/bin:/run/current-system/sw/bin:/usr/bin:/bin:/usr/sbin:/sbin"},
-         Ld.Variable{"N_KEYCHAIN", "com.pedro.codexvoice.openrouter.v1"},
-         Ld.Variable{"WHATSAPP_BIN", home() ++ "/.local/bin/whatsapp"}, Ld.Variable{"NTN_BIN", home() ++ "/.local/bin/ntn"},
-         Ld.Variable{"N_NOTION_WORKSPACE", "0f117ff1-3c33-4281-b610-0bf4bab8e267"}], "n-editor", 4610},
-       Ld.Agent{"notion", "com.pedro.n-notion", "/run/current-system/sw/bin/node", [notion_dir() ++ "/main.ts"],
-        [Ld.Variable{"N_CHECK_URL", "http://127.0.0.1:4610/api/check"}, Ld.Variable{"NTN_BIN", home() ++ "/.local/bin/ntn"},
-         Ld.Variable{"N_NOTION_WORKSPACE", "0f117ff1-3c33-4281-b610-0bf4bab8e267"},
-         Ld.Variable{"PATH", "/run/current-system/sw/bin:/usr/bin:/bin:/usr/sbin:/sbin"}], "n-notion", 0}],
-      [ND.Serve{"editor", 9447, 4610, ""}]}}, [], ["editor", "notion"]}
+         Ld.Variable{"PATH", "/Library/Frameworks/Python.framework/Versions/3.14/bin:/run/current-system/sw/bin:/usr/bin:/bin:/usr/sbin:/sbin"}], "n-editor", 4610}],
+      [ND.Serve{"editor", 9447, 4610, ""}]}}, [], ["editor"]}
 
 def system() -> S.System:
-  S.System{"v", "V", "Data structures for your Bend algorithms.", [library(), editor(), notion(), browser()],
+  S.System{"v", "V", "Data structures for your Bend algorithms.", [library(), editor(), browser()],
     D.Deployment{"https://pedros-mac-mini.tail90fb4c.ts.net:9447", [], [], [
       D.Node{"machine", "Their machine", "macOS or Linux", D.Device{}, H.Other{}, D.Unmanaged{}, [], ["library"]},
       mac_mini(),
@@ -122,9 +98,7 @@ def environment() -> En.Environment:
       external("d2", "D2", "Draws diagrams from text.", C.Cli{}, []),
       external("openrouter", "OpenRouter", "Serves Jev, the model that reads each phrase.", C.ModelApi{}, []),
       external("elevenlabs", "ElevenLabs", "Transcribes speech with Scribe.", C.ModelApi{}, []),
-      external("claude", "Claude Code", "Runs N before it reads a prompt.", C.Cli{}, []),
-      external("notion-api", "Notion", "Holds Pedro's pages.", C.DataApi{}, []),
-      external("whatsapp", "WhatsApp", "Pedro's chats, through a local bridge.", C.DataApi{}, []) ],
+      external("claude", "Claude Code", "Runs N before it reads a prompt.", C.Cli{}, []) ],
     [K.OpenSource{}],
     I.Inventory{I.Vendor{"Apple", "iCloud"}, [I.Device{"mac-mini", "Mac mini", "macOS"}, I.Device{"iphone", "iPhone", "iOS"}]},
     G.Agreement{"", [], [], []}}

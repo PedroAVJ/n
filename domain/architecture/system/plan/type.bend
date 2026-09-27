@@ -21,10 +21,11 @@ type Tag is Data:
 type Observed is Data:
   Observed{files: List<&2, String>, reached: List<&2, String>, hubs: List<&2, Hub>, remote: Remote, tags: List<&2, Tag>}
 
-# One step of a plan. Publish, Push, ReleasePlugin, Rebuild and ServePort change the world; Current and Change do not
+# One step of a plan. Publish, Push, ReleasePlugin, Rebuild, ServePort and Launch change the world; Current and Change do not
 # (a Change is what a Rebuild would change, shown by a dry run); Blocked stops the deploy.
 # Rebuild: write a nix-darwin node's flake and darwin-rebuild switch it. ServePort: serve a tailnet
-# HTTPS port from a local target, with the given Tailscale command.
+# HTTPS port from a local target, with the given Tailscale command. Launch: write a launch agent's plist and
+# (re)load it in the user's launchd domain.
 type Step is Data:
   Current{what: String}
   Publish{name: String, version: String, entry: String}
@@ -32,5 +33,7 @@ type Step is Data:
   ReleasePlugin{name: String, version: String, marketplace: String, create: Bool}
   Rebuild{host: String, flake: String, mac: String}
   ServePort{https: U32, target: String, tailscale: String}
+  Launch{label: String, path: String, plist: String, domain: String}
+  Install{from: String, to: String}
   Change{what: String, now: String, want: String}
   Blocked{what: String, why: String}

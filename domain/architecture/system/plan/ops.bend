@@ -113,6 +113,10 @@ def show(s: P.Step) -> String:
       "push     github " ++ r
     case P.ReleasePlugin{+n, +v, r, create}:
       "release  plugin " ++ n ++ "@" ++ v ++ " to marketplace github " ++ r ++ " as tag " ++ n ++ "-v" ++ v ++ Bool.pick(String, create, " (a new repository)", "")
+    case P.Launch{l, _, _, _}:
+      "launch   " ++ l
+    case P.Install{_, t}:
+      "install  " ++ t
     case P.Rebuild{h, _, _}:
       "rebuild  nix-darwin " ++ h
     case P.ServePort{p, t, _}:

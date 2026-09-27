@@ -8,6 +8,7 @@ import ./container/effects.bend as CtE
 import ./deployment/type.bend as D
 import ./deployment/ops.bend as DO
 import ./deployment/azure/effects.bend as AzE
+import ./deployment/launchd/effects.bend as LdE
 import ./deployment/nix_darwin/type.bend as ND
 import ./deployment/nix_darwin/ops.bend as NDO
 import ./deployment/nix_darwin/effects.bend as NDE
@@ -308,6 +309,18 @@ def apply(+root: String, +bend: String, s: P.Step) -> IO(Unit):
       do IO<Unit>:
         ok : Bool <- release_plugin(root, n, v, r, create)
         IO.print(Bool.pick(String, ok, "released plugin " ++ n ++ "@" ++ v, "failed   release plugin " ++ n ++ "@" ++ v))
+    case P.Install{+from, +to}:
+      do IO<Unit>:
+        _ : Bool <- X.succeeds("/bin/mkdir", ["-p", Fs.path.parent(to)])
+        ok : Bool <- X.succeeds("/bin/cp", [from, to])
+        IO.print(Bool.pick(String, ok, "installed " ++ to, "failed   install " ++ to))
+    case P.Launch{+l, +path, +plist, +domain}:
+      do IO<Unit>:
+        _ : Bool <- X.succeeds("/bin/mkdir", ["-p", Fs.path.parent(path)])
+        X.write(path, plist)
+        _ : Bool <- X.succeeds("/bin/launchctl", ["bootout", domain ++ "/" ++ l])
+        ok : Bool <- X.succeeds("/bin/launchctl", ["bootstrap", domain, path])
+        IO.print(Bool.pick(String, ok, "launched " ++ l, "failed   launch " ++ l))
     case P.Rebuild{+h, +fl, +mac}:
       do IO<Unit>:
         _ : Result<&1, &1, U32 & String, Unit> <- Fs.mkdir(root ++ "/nix")
@@ -402,6 +415,8 @@ def platform_steps(p: D.Platform, +root: String, +k: String, +a: A.Architecture)
       darwin_steps(root, k, nd)
     case D.AzureCloud{az}:
       AzE.checks(az, O.agreement(a))
+    case D.Launchd{ld}:
+      LdE.checks(root, k, ld)
 
 def node_steps(ns: List<&2, D.Node>, +root: String, +a: A.Architecture) -> IO(List<&2, P.Step>):
   match ns:

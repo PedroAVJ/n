@@ -2,17 +2,20 @@ import Base
 import ./host/type.bend as H
 import ./nix_darwin/type.bend as ND
 import ./azure/type.bend as Az
+import ./launchd/type.bend as Ld
 
 # A device is someone's own (a phone, a laptop); a server runs the system for others.
 type Role is Data:
   Device{}
   Server{}
 
-# What configures a node: nothing V manages, nix-darwin, or an Azure subscription.
+# What configures a node: nothing V manages, nix-darwin, an Azure subscription, or only the launch agents and
+# Tailscale serves V declares on a Mac something else configures.
 type Platform is Data:
   Unmanaged{}
   Darwin{config: ND.NixDarwin}
   AzureCloud{config: Az.Azure}
+  Launchd{config: Ld.Launchd}
 
 # Where containers run: a machine, a runtime inside it, nested as deep as it is. Instances are container keys.
 type Node is Data:

@@ -2,6 +2,12 @@ import Base
 import ../../../general/http/type.bend as H
 import ../../../general/http/ops.bend as HO
 
+# Listening on 127.0.0.1 only, so the site is reached through what fronts it (Tailscale Serve), never the
+# local network.
+def listen_local(port: U32) -> IO(Result<&1, &1, U32 & String, Listener>):
+  import "./listen_local.c"
+  import "./listen_local.js"
+
 # Serving HTTP over TCP: each connection is read to a whole request, answered by the handler, and closed,
 # in a computation of its own so a slow answer does not hold the others up.
 
@@ -105,5 +111,5 @@ def listening(~handle: H.Request -> IO(H.Response), r: Result<&1, &1, U32 & Stri
 
 def serve(~handle: H.Request -> IO(H.Response), +port: U32) -> IO(Unit):
   do IO<Unit>:
-    r : Result<&1, &1, U32 & String, Listener> <- TCP.listen(port)
+    r : Result<&1, &1, U32 & String, Listener> <- listen_local(port)
     listening(~handle, r, port)

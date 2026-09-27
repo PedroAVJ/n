@@ -8,7 +8,7 @@ import type { Mark, Review } from '@/lib/n';
 // reads the whole of it a moment later, and its findings replace Jev's. A finding's fix or reading replaces
 // its phrase when chosen. A chat message is read against its chat (`context`). `commit` saves or sends the text, and a sent text leaves the box empty.
 type Found = Mark & { quote: string; jev?: boolean };
-type Props = { context?: string; initial: string; commit: (text: string) => Promise<string | void>; label: string; clears?: boolean; rows?: string; onText?: (text: string) => void; placeholder?: string };
+type Props = { draft: string; context?: string; initial: string; commit: (text: string) => Promise<string | void>; label: string; clears?: boolean; rows?: string; onText?: (text: string) => void; placeholder?: string };
 
 // A finding follows its phrase while the text around it changes, and is dropped once the phrase is gone.
 function place(text: string, found: Found[]): Found[] {
@@ -22,7 +22,7 @@ function place(text: string, found: Found[]): Found[] {
 
 const tone = (f: Found) => f.jev ? 'decoration-stone-400' : f.fixable ? 'decoration-sky-600' : f.level === 'error' || f.level === 'high' ? 'decoration-red-600' : 'decoration-orange-600';
 
-export function Writer({ context = '', initial, commit, label, clears, rows = 'h-[60vh]', onText, placeholder }: Props) {
+export function Writer({ draft, context = '', initial, commit, label, clears, rows = 'h-[60vh]', onText, placeholder }: Props) {
   const [text, setText] = useState(initial); const [base, setBase] = useState(initial);
   const [found, setFound] = useState<Found[]>([]); const [by, setBy] = useState(''); const [checking, setChecking] = useState(false);
   const [status, setStatus] = useState(''); const [busy, setBusy] = useState(false);
@@ -32,6 +32,17 @@ export function Writer({ context = '', initial, commit, label, clears, rows = 'h
   const area = useRef<HTMLTextAreaElement>(null); const mirror = useRef<HTMLDivElement>(null);
   const latest = useRef(text); latest.current = text;
   useEffect(() => { onText?.(text); }, [text, onText]);
+  // An unsent or unsaved draft outlives a reload, in this browser, until it is sent or saved; text typed
+  // before the page came alive is kept too.
+  const key = `n-draft:${draft}`;
+  useEffect(() => {
+    let kept: string | null = null;
+    try { kept = localStorage.getItem(key); } catch {}
+    const typed = area.current?.value ?? '';
+    if (typed && typed !== initial) setText(typed); else if (kept !== null && kept !== initial) setText(kept);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  useEffect(() => { try { if (text === (clears ? '' : base)) localStorage.removeItem(key); else localStorage.setItem(key, text); } catch {} }, [text, base, key, clears]);
 
   const read = (v: string, r: Review, jev = false) => r.marks.map(m => ({ ...m, quote: v.slice(m.start, m.end), jev }));
   const byN = useRef(false);

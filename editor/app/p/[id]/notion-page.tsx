@@ -12,5 +12,5 @@ export function NotionPage({ id, title, raw, initial }: { id: string; title: str
     const out = await r.json() as { raw: string; text: string };
     base.current = out.raw; return out.text;
   }, [id]);
-  return <Writer initial={initial} commit={commit} label="Save" rows="h-[65vh]" />;
+  return <Writer draft={`notion:${id}`} initial={initial} commit={commit} label="Save" rows="h-[65vh]" />;
 }

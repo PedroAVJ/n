@@ -31,6 +31,6 @@ export function Conversation({ jid, name, group, initial }: { jid: string; name:
         </div>; })}
       <div ref={end} />
     </div>
-    <Writer context={context} initial="" commit={commit} label="Send" clears rows="h-36" placeholder={`Message ${name}`} />
+    <Writer draft={`whatsapp:${jid}`} context={context} initial="" commit={commit} label="Send" clears rows="h-36" placeholder={`Message ${name}`} />
   </div>;
 }

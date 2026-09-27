@@ -18,7 +18,7 @@ export function Editor({ name, initial }: { name: string; initial: string }) {
     <Link href="/" className="text-sm text-stone-500 hover:text-orange-700 dark:text-zinc-400">← N</Link>
     <h1 className="text-3xl font-semibold">{title}</h1>
     <div className="flex flex-col gap-5 lg:flex-row">
-      <div className="lg:w-1/2"><Writer initial={initial} commit={commit} label="Save" onText={setText} rows="h-[70vh]" /></div>
+      <div className="lg:w-1/2"><Writer draft={`doc:${name}`} initial={initial} commit={commit} label="Save" onText={setText} rows="h-[70vh]" /></div>
       <article className="preview lg:w-1/2 lg:max-h-[70vh] lg:overflow-y-auto" dangerouslySetInnerHTML={{ __html: html }} />
     </div>
   </main>;

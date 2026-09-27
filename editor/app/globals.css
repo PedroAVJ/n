@@ -1,10 +1,1 @@
 @import "tailwindcss";
-.preview h1 { font-size: 1.75rem; font-weight: 650; margin: 0 0 .75rem; }
-.preview h2 { font-size: 1.3rem; font-weight: 600; margin: 1.25rem 0 .5rem; }
-.preview h3 { font-size: 1.1rem; font-weight: 600; margin: 1rem 0 .4rem; }
-.preview p { margin: 0 0 .8rem; line-height: 1.6; }
-.preview ul, .preview ol { margin: 0 0 .8rem 1.25rem; list-style: revert; }
-.preview code { font-family: ui-monospace, Menlo, monospace; font-size: .9em; background: color-mix(in srgb, currentColor 10%, transparent); padding: .05em .3em; border-radius: 4px; }
-.preview pre { overflow-x: auto; padding: .75rem; border-radius: 8px; background: color-mix(in srgb, currentColor 8%, transparent); margin: 0 0 .8rem; }
-.preview pre code { background: none; padding: 0; }
-.preview a { text-decoration: underline; }

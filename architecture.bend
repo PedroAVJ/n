@@ -45,7 +45,7 @@ def library() -> Ct.Container:
 # N's binary; served from Pedro's Mac mini.
 def editor() -> Ct.Container:
   Ct.Container{"editor", "N editor", "Where .n documents are written and checked: Check runs N's type check, lint and format, makes the fixes N is sure of, and leaves the rest to choose.",
-    C.Client{}, Ct.Ours{}, Ct.Tailnet{}, [C.Hosting{}], "editor", [], ["Next.js", "Tailwind CSS"], ["React", "markdown-it", "Claude Agent SDK"], ["TypeScript", "JavaScript"], [], [],
+    C.Client{}, Ct.Ours{}, Ct.Tailnet{}, [C.Hosting{}], "editor", [], ["Next.js", "Tailwind CSS"], ["React", "Claude Agent SDK"], ["TypeScript", "JavaScript"], [], [],
     [uses("library", "Checks documents with N's binary", "n prompt, n read"),
      uses("claude", "Checks documents with", "Agent SDK"),
      uses("elevenlabs", "Transcribes dictation with Scribe through", "the elevenlabs CLI")]}

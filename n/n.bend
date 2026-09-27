@@ -23,7 +23,7 @@ def model() -> String:
   "typesafe/jev-1.13"
 
 def version() -> Pl.Version:
-  Pl.Version{0n, 9n, 1n}
+  Pl.Version{0n, 10n, 0n}
 
 # ---- the hook ----
 # Jev screens every phrase; Claude runs N4's checker on what Jev flagged and gives each finding its one

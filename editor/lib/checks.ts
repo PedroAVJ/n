@@ -46,7 +46,11 @@ async function run(name: string, r: Result) {
     let text = r.base; const isolate: string[] = [];
     for (const which of ['type', 'lint', 'format'] as Which[]) {
       const found = (await check(text, which, wanted, isolate)).marks.map(m => ({ ...m, quote: text.slice(m.start, m.end) }));
-      const fix = found.filter(f => f.fixable && !f.options?.length).sort((a, b) => b.start - a.start);
+      // Fixes from the end back, so each phrase is still where N found it; one overlapping a fix already
+      // made is left out.
+      const fix: Finding[] = [];
+      for (const f of found.filter(f => f.fixable && !f.options?.length).sort((a, b) => b.start - a.start))
+        if (!fix.some(g => f.start < g.end && g.start < f.end)) fix.push(f);
       for (const f of fix) text = text.slice(0, f.start) + f.new + text.slice(f.end);
       r.fixed += fix.length;
       const left = found.filter(f => !fix.includes(f));

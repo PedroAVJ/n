@@ -184,7 +184,7 @@ def lint_prompt(+text: String) -> String:
 
 def format_prompt(+text: String) -> String:
   about(text) ++
-  "The text has passed the type check and lint. Run FORMAT only: nothing but the truth. Is there only what matters? Report each span that repeats what the text already says, or says what does not matter. Level \"format\". Every format finding is fixable, because the text is already correct and precise: delete the span, or merge it into one statement, keeping the meaning and the structure, like a code formatter.\n\n" ++
+  "The text has passed the type check and lint; any span still wrong or ambiguous is listed as ISOLATED below: leave those exactly as they are. Run FORMAT only: nothing but the truth. Condense the text so it says each thing once and only what matters, the way a formatter rewrites a program without changing what it does. Remove repetition and restated points; remove a detour the author takes back (\"actually, scratch that\") together with what it retracts, keeping the correction; remove filler and asides that add nothing; merge sentences that say one thing. Keep the author's meaning, position, voice and the order of the ideas. Work through the WHOLE text, not a few spans: a long dictated text usually condenses a lot. Report each change as its own span (a sentence or a run of sentences is fine; spans must not overlap) with its rewrite in \"new\" (empty string deletes it). Level \"format\". Every format finding is fixable, because the text is already correct and precise.\n\n" ++
   answer_shape("\"format\"") ++ text
 
 # What the author said they meant about earlier findings, and the spans an earlier check found wrong and

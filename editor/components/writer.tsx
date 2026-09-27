@@ -3,18 +3,20 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { Result } from '@/lib/checks';
 import { useDictation } from './dictation';
-import { Findings, place, type Placed } from './findings';
+import { place, Squiggles, type Placed } from './findings';
 
 // A .n document, written and checked by N. Check saves the text and has N compile it in the background:
-// the type check, lint and format, every fix N is sure of applied, and what is left listed as errors and
-// warnings, each with its suggestions and a box for what the author means. The page can be left while N
-// works; its result is there when the page comes back. An unsaved draft is kept on the Mac mini.
+// the type check, lint and format, every fix N is sure of applied, and what is left marked in View mode as
+// errors and warnings, each with its suggestions and a box for what the author means. The page can be left
+// while N works; its result is there when the page comes back. An unsaved draft is kept on the Mac mini.
 type Props = { name: string; initial: string; commit: (text: string) => Promise<void>; onText?: (text: string) => void };
 
 export function Writer({ name, initial, commit, onText }: Props) {
   const [text, setText] = useState(initial); const [base, setBase] = useState(initial);
   const [status, setStatus] = useState(''); const [busy, setBusy] = useState(false);
   const [check, setCheck] = useState<Result | null>(null); const [intents, setIntents] = useState<Record<string, string>>({});
+  // Edit: the text box. View: the text with N's errors and warnings under squiggles.
+  const [mode, setMode] = useState<'edit' | 'view'>('edit');
   const area = useRef<HTMLTextAreaElement>(null);
   const latest = useRef(text); latest.current = text;
   useEffect(() => { onText?.(text); }, [text, onText]);
@@ -54,7 +56,7 @@ export function Writer({ name, initial, commit, onText }: Props) {
         const c = await r.json() as Result | null; const is = await i.json() as Array<{ quote: string; intent: string }>;
         if (stop) return;
         setCheck(c); setIntents(Object.fromEntries(is.map(x => [x.quote, x.intent])));
-        if (c?.status === 'done' && applied.current !== c.started && latest.current === c.base) { applied.current = c.started; setText(c.text); setBase(c.text); }
+        if (c?.status === 'done' && applied.current !== c.started && latest.current === c.base) { applied.current = c.started; setText(c.text); setBase(c.text); if (c.errors.length || c.warnings.length) setMode('view'); }
         if (c?.status === 'running') setTimeout(look, 3000);
       } catch { if (!stop) setTimeout(look, 5000); }
     };
@@ -85,8 +87,7 @@ export function Writer({ name, initial, commit, onText }: Props) {
 
   const found: Placed[] = check && check.status !== 'running' ? [...check.errors.map(f => ({ ...f, error: true })), ...check.warnings.map(f => ({ ...f, error: false }))] : [];
   const shown = place(text, found);
-  const apply = (f: Placed, choice: string) => { setText(text.slice(0, f.start) + choice + text.slice(f.end)); area.current?.focus(); };
-  const pick = (f: Placed) => { const a = area.current; if (!a) return; a.focus(); a.setSelectionRange(f.start, f.end); };
+  const apply = (f: Placed, choice: string) => setText(text.slice(0, f.start) + choice + text.slice(f.end));
   const errors = shown.filter(f => f.error).length, warnings = shown.length - errors;
   const verdict = !check ? null
     : check.status === 'running' ? { tone: 'bg-stone-200 text-stone-700 dark:bg-zinc-800 dark:text-zinc-300', label: 'N is checking in the background: you can leave this page', spin: true }
@@ -96,9 +97,15 @@ export function Writer({ name, initial, commit, onText }: Props) {
   const stale = check?.status === 'done' && text !== check.text && text === base ? 'Edited since this check' : '';
 
   return <div className="flex flex-col gap-3">
-    <label htmlFor="writer" className="sr-only">Text</label>
-    <textarea id="writer" ref={area} value={text} spellCheck onChange={e => { setText(e.target.value); setStatus(''); }}
-      className="h-[70vh] w-full resize-y rounded-lg border border-stone-200 bg-transparent p-4 font-mono text-[15px] leading-relaxed outline-none focus:border-orange-700 dark:border-zinc-800" />
+    <div role="tablist" aria-label="Mode" className="flex gap-1 self-start rounded-lg border border-stone-200 p-1 dark:border-zinc-800">
+      {(['edit', 'view'] as const).map(m => <button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)}
+        className={`rounded-md px-3 py-1 text-sm ${mode === m ? 'bg-stone-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : 'text-stone-600 dark:text-zinc-400'}`}>{m === 'edit' ? 'Edit' : 'View'}</button>)}
+    </div>
+    {mode === 'edit' ? <>
+      <label htmlFor="writer" className="sr-only">Text</label>
+      <textarea id="writer" ref={area} value={text} spellCheck onChange={e => { setText(e.target.value); setStatus(''); }}
+        className="h-[70vh] w-full resize-y rounded-lg border border-stone-200 bg-transparent p-4 font-mono text-[15px] leading-relaxed outline-none focus:border-orange-700 dark:border-zinc-800" />
+    </> : <Squiggles text={text} shown={shown} name={name} apply={apply} intents={intents} />}
     <div className="flex flex-wrap items-center gap-2">
       <Button onClick={compile} disabled={busy || check?.status === 'running'} className="rounded-md bg-stone-900 px-4 py-2 text-white hover:bg-orange-700 dark:bg-zinc-100 dark:text-zinc-900">Check</Button>
       <Button onClick={() => save()} disabled={busy} className="rounded-md border border-stone-300 px-4 py-2 hover:border-orange-700 dark:border-zinc-700">Save</Button>
@@ -108,6 +115,5 @@ export function Writer({ name, initial, commit, onText }: Props) {
         {verdict.spin && <span aria-hidden className="size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />}{verdict.label}</span>}
       <span className="text-sm text-stone-500 dark:text-zinc-400">{[text !== base ? 'Unsaved' : '', stale, status].filter(Boolean).join(' · ')}</span>
     </div>
-    <Findings shown={shown} text={text} name={name} pick={pick} apply={apply} intents={intents} />
   </div>;
 }

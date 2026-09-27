@@ -108,6 +108,6 @@ export function Writer({ name, initial, commit, onText }: Props) {
         {verdict.spin && <span aria-hidden className="size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />}{verdict.label}</span>}
       <span className="text-sm text-stone-500 dark:text-zinc-400">{[text !== base ? 'Unsaved' : '', stale, status].filter(Boolean).join(' · ')}</span>
     </div>
-    <Findings shown={shown} name={name} pick={pick} apply={apply} intents={intents} />
+    <Findings shown={shown} text={text} name={name} pick={pick} apply={apply} intents={intents} />
   </div>;
 }

@@ -22,11 +22,11 @@ def bend_step(built: Bool, same: Bool, +entry: String, +from: String, +path: Str
   Bool.pick(P.Step, Bool.not(built), P.Blocked{what, entry ++ " does not build"},
     Bool.pick(P.Step, same, P.Current{"program " ++ path}, P.Install{from, path}))
 
-# A Next.js build is current while it was built from the folder's committed tree.
-def next_step(+tree: String, +installed: String, +folder: String, +path: String, +what: String) -> P.Step:
+# A Next.js or Node build is current while it was built from the folder's committed tree.
+def next_step(+tree: String, +installed: String, +folder: String, +path: String, +what: String, next: Bool) -> P.Step:
   Bool.pick(P.Step, String.is_empty(tree), P.Blocked{what, folder ++ " is not in the repository's commit"},
     Bool.pick(P.Step, String.eq(tree, installed), P.Current{"program " ++ path ++ " (" ++ folder ++ " @ " ++ String.take(tree, 7n) ++ ")"},
-      P.BuildNext{folder, tree, path}))
+      Bool.pick(P.Step, next, P.BuildNext{folder, tree, path}, P.BuildNode{folder, tree, path})))
 
 def program_step(+root: String, +home: String, +what: String, g: L.Program) -> IO(P.Step):
   match g:
@@ -47,7 +47,12 @@ def program_step(+root: String, +home: String, +what: String, g: L.Program) -> I
           do IO<P.Step>:
             tree : String <- X.run("git", ["-C", root, "rev-parse", "HEAD:" ++ folder])
             installed : String <- X.read(path ++ "/.v-commit")
-            return next_step(String.trim(tree), String.trim(installed), folder, path, what)
+            return next_step(String.trim(tree), String.trim(installed), folder, path, what, True{})
+        case L.Node{+folder}:
+          do IO<P.Step>:
+            tree : String <- X.run("git", ["-C", root, "rev-parse", "HEAD:" ++ folder])
+            installed : String <- X.read(path ++ "/.v-commit")
+            return next_step(String.trim(tree), String.trim(installed), folder, path, what, False{})
 
 def program_steps(gs: List<&2, L.Program>, +root: String, +home: String, +what: String) -> IO(List<&2, P.Step>):
   match gs:
@@ -64,6 +69,8 @@ def installs(s: P.Step) -> Bool:
     case P.Install{_, _}:
       True{}
     case P.BuildNext{_, _, _}:
+      True{}
+    case P.BuildNode{_, _, _}:
       True{}
     case _:
       False{}

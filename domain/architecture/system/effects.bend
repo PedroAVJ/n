@@ -344,6 +344,14 @@ def apply(+root: String, +bend: String, s: P.Step) -> IO(Unit):
         +ok : Bool = cloned && deps && built && copied
         Bool.pick(IO(Unit), ok, X.write(dir ++ "/.v-commit", tree), IO.pure(Unit, Unit{}))
         IO.print(Bool.pick(String, ok, "built    " ++ f ++ " into " ++ dir, "failed   build " ++ f))
+    case P.BuildNode{+f, +tree, +dir}:
+      do IO<Unit>:
+        _ : Bool <- X.succeeds("/bin/mkdir", ["-p", dir])
+        copied : Bool <- X.succeeds("/usr/bin/rsync", ["-a", "--delete", "--exclude", "node_modules", root ++ "/" ++ f ++ "/", dir ++ "/"])
+        deps : Bool <- X.succeeds("/run/current-system/sw/bin/npm", ["--prefix", dir, "ci", "--omit=dev", "--no-audit", "--no-fund"])
+        +ok : Bool = copied && deps
+        Bool.pick(IO(Unit), ok, X.write(dir ++ "/.v-commit", tree), IO.pure(Unit, Unit{}))
+        IO.print(Bool.pick(String, ok, "built    " ++ f ++ " into " ++ dir, "failed   build " ++ f))
     case P.Install{+from, +to}:
       do IO<Unit>:
         _ : Bool <- X.succeeds("/bin/mkdir", ["-p", Fs.path.parent(to)])

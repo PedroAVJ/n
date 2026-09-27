@@ -117,6 +117,8 @@ def show(s: P.Step) -> String:
       "install  " ++ t
     case P.BuildNext{f, +tree, d}:
       "build    " ++ f ++ " @ " ++ String.take(tree, 7n) ++ " (Next.js) into " ++ d
+    case P.BuildNode{f, +tree, d}:
+      "build    " ++ f ++ " @ " ++ String.take(tree, 7n) ++ " (Node) into " ++ d
     case P.Rebuild{h, _, _}:
       "rebuild  nix-darwin " ++ h
     case P.ServePort{p, t, _}:

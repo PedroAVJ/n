@@ -65,7 +65,8 @@ def package_name(+name: String) -> String:
   Bool.pick(String, String.eq(name, "OpenRouter SDK"), "@openrouter/sdk",
   Bool.pick(String, String.eq(name, "Sentry SDK"), "@sentry/nextjs",
   Bool.pick(String, String.eq(name, "Claude Agent SDK"), "@anthropic-ai/claude-agent-sdk",
-  Bool.pick(String, String.eq(name, "whatsmeow"), "go.mau.fi/whatsmeow", name))))))))
+  Bool.pick(String, String.eq(name, "Playwright MCP"), "@playwright/mcp",
+  Bool.pick(String, String.eq(name, "whatsmeow"), "go.mau.fi/whatsmeow", name)))))))))
 
 # Whether a language is written in files with this extension.
 def language_extension(+name: String, +ext: String) -> Bool:

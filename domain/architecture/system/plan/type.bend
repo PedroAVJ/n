@@ -36,5 +36,6 @@ type Step is Data:
   Launch{label: String, path: String, plist: String, domain: String}
   Install{from: String, to: String}
   BuildNext{folder: String, tree: String, dir: String}
+  BuildNode{folder: String, tree: String, dir: String}
   Change{what: String, now: String, want: String}
   Blocked{what: String, why: String}

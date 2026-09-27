@@ -41,15 +41,17 @@ def library() -> Ct.Container:
       Co.Component{"n", "N", "A type checker for prompts: flags each phrase with more than one reading before an agent acts on it.", Co.Bend{},
         [uses("openrouter", "Asks Jev which phrases are unclear through", "HTTPS"), uses("claude", "Checks each prompt as a hook of", "UserPromptSubmit")]} ], []}
 
-# N's editor: where .n documents are written until each says exactly one thing. A Next.js app in editor/,
-# checking through N's binary; served from Pedro's Mac mini.
+# N's editor: where Pedro writes, checked as he writes: WhatsApp replies against their chat, Notion pages,
+# and .n documents. A Next.js app in editor/, checking through N's binary; served from Pedro's Mac mini.
 def editor() -> Ct.Container:
-  Ct.Container{"editor", "N editor", "Where .n documents are written until each says exactly one thing: Jev screens them, Claude gives the readings.",
+  Ct.Container{"editor", "N editor", "Where WhatsApp replies, Notion pages and .n documents are written until each says exactly one thing: Jev screens them as they are typed, Claude gives the readings.",
     C.Client{}, Ct.Ours{}, Ct.Tailnet{}, [C.Hosting{}], "editor", [], ["Next.js", "Tailwind CSS"], ["React", "markdown-it", "Claude Agent SDK"], ["TypeScript", "JavaScript"], [], [],
     [uses("library", "Checks documents with N's binary", "n screen, n prompt, n read"),
      uses("openrouter", "Screens documents with Jev through", "HTTPS"),
      uses("claude", "Checks documents with", "Agent SDK"),
-     uses("elevenlabs", "Transcribes dictation with Scribe through", "the elevenlabs CLI")]}
+     uses("elevenlabs", "Transcribes dictation with Scribe through", "the elevenlabs CLI"),
+     uses("whatsapp", "Reads chats and sends replies through", "the whatsapp CLI"),
+     uses("notion-api", "Reads and saves pages through", "REST with ntn")]}
 
 # N on Notion: checks Pedro's Notion pages as they are written. It finds edited pages and reads them through
 # Notion's REST API; an agent answers on its website, the only API that anchors a comment to a phrase or
@@ -88,7 +90,9 @@ def mac_mini() -> D.Node:
         [Ld.Variable{"PORT", "4610"}, Ld.Variable{"HOSTNAME", "127.0.0.1"}, Ld.Variable{"N_BIN", n_bin()},
          Ld.Variable{"ELEVENLABS_BIN", home() ++ "/.local/bin/elevenlabs"},
          Ld.Variable{"PATH", "/Library/Frameworks/Python.framework/Versions/3.14/bin:/run/current-system/sw/bin:/usr/bin:/bin:/usr/sbin:/sbin"},
-         Ld.Variable{"N_KEYCHAIN", "com.pedro.codexvoice.openrouter.v1"}], "n-editor", 4610},
+         Ld.Variable{"N_KEYCHAIN", "com.pedro.codexvoice.openrouter.v1"},
+         Ld.Variable{"WHATSAPP_BIN", home() ++ "/.local/bin/whatsapp"}, Ld.Variable{"NTN_BIN", home() ++ "/.local/bin/ntn"},
+         Ld.Variable{"N_NOTION_WORKSPACE", "0f117ff1-3c33-4281-b610-0bf4bab8e267"}], "n-editor", 4610},
        Ld.Agent{"notion", "com.pedro.n-notion", "/run/current-system/sw/bin/node", [notion_dir() ++ "/main.ts"],
         [Ld.Variable{"N_CHECK_URL", "http://127.0.0.1:4610/api/check"}, Ld.Variable{"NTN_BIN", home() ++ "/.local/bin/ntn"},
          Ld.Variable{"N_NOTION_WORKSPACE", "0f117ff1-3c33-4281-b610-0bf4bab8e267"},
@@ -119,7 +123,8 @@ def environment() -> En.Environment:
       external("openrouter", "OpenRouter", "Serves Jev, the model that reads each phrase.", C.ModelApi{}, []),
       external("elevenlabs", "ElevenLabs", "Transcribes speech with Scribe.", C.ModelApi{}, []),
       external("claude", "Claude Code", "Runs N before it reads a prompt.", C.Cli{}, []),
-      external("notion-api", "Notion", "Holds Pedro's pages.", C.DataApi{}, []) ],
+      external("notion-api", "Notion", "Holds Pedro's pages.", C.DataApi{}, []),
+      external("whatsapp", "WhatsApp", "Pedro's chats, through a local bridge.", C.DataApi{}, []) ],
     [K.OpenSource{}],
     I.Inventory{I.Vendor{"Apple", "iCloud"}, [I.Device{"mac-mini", "Mac mini", "macOS"}, I.Device{"iphone", "iPhone", "iOS"}]},
     G.Agreement{"", [], [], []}}

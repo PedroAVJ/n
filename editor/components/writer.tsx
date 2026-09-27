@@ -1,19 +1,21 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { tone, useN, type Found } from './use-n';
+import { useN, type Found } from './use-n';
+import { fixable } from './fixes';
 import { Findings, PhaseBadge } from './findings';
 
-// Writing with N as it is written, like a code editor with its checker: each phrase with more than one
-// reading is underlined in the text while you type (see useN). A finding's fix or reading replaces its
-// phrase when chosen. `commit` saves or sends the text, and a sent text leaves the box empty.
+// Writing, checked by N when asked: Check makes every fix N is sure of and lists what it cannot fix, whose
+// readings replace the phrase when chosen. `commit` saves or sends the text, and a sent text leaves the
+// box empty.
 type Props = { draft: string; initial: string; commit: (text: string) => Promise<string | void>; label: string; clears?: boolean; rows?: string; onText?: (text: string) => void; placeholder?: string };
 
 export function Writer({ draft, initial, commit, label, clears, rows = 'h-[60vh]', onText, placeholder }: Props) {
   const [text, setText] = useState(initial); const [base, setBase] = useState(initial);
   const [status, setStatus] = useState(''); const [busy, setBusy] = useState(false);
   const [listening, setListening] = useState(false); const recorder = useRef<MediaRecorder | null>(null);
-  const area = useRef<HTMLTextAreaElement>(null); const mirror = useRef<HTMLDivElement>(null);
+  const area = useRef<HTMLTextAreaElement>(null);
+  const latest = useRef(text); latest.current = text;
   useEffect(() => { onText?.(text); }, [text, onText]);
   // An unsent or unsaved draft is kept on the Mac mini until it is sent or saved, so it outlives a reload
   // and is the same in Safari and the Home Screen app. Text typed before the page came alive is kept too.
@@ -42,7 +44,16 @@ export function Writer({ draft, initial, commit, label, clears, rows = 'h-[60vh]
     return () => window.removeEventListener('pagehide', leave);
   }, [text, idle, store]);
 
-  const { shown, phase, forget, reset } = useN(text);
+  const { shown, phase, forget, reset, check, busy: checking } = useN(text);
+  // Check: N reads the text now; every fix it is sure of is made, from the end back so each phrase is
+  // still where N found it, and what it cannot fix is left to choose.
+  const autofix = async () => {
+    const v = text; const fs = fixable(await check(v));
+    if (latest.current !== v) { setStatus('The text changed while N read it: check again'); return; }
+    let next = v; for (const f of fs) next = next.slice(0, f.start) + f.new + next.slice(f.end);
+    if (fs.length) { setText(next); fs.forEach(forget); }
+    setStatus(fs.length ? `Fixed ${fs.length}` : '');
+  };
   const edit = (v: string) => { setText(v); setStatus(''); };
   const apply = (f: Found, choice: string) => { const next = text.slice(0, f.start) + choice + text.slice(f.end); setText(next); forget(f); area.current?.focus(); };
   const pick = (f: Found) => { const a = area.current; if (!a) return; a.focus(); a.setSelectionRange(f.start, f.end); };
@@ -79,21 +90,16 @@ export function Writer({ draft, initial, commit, label, clears, rows = 'h-[60vh]
     rec.start(); setListening(true); setStatus('Listening… press Dictate again to stop');
   };
 
-  // The underlines: the same text behind the transparent box, each finding's phrase underlined.
-  const pieces: React.ReactNode[] = []; let at = 0;
-  for (const f of shown) { pieces.push(text.slice(at, f.start)); pieces.push(<mark key={f.start} className={`bg-transparent text-transparent underline decoration-wavy decoration-2 underline-offset-4 ${tone(f)}`}>{text.slice(f.start, f.end)}</mark>); at = f.end; }
-  pieces.push(text.slice(at) + '\n');
   const box = 'w-full rounded-lg border p-4 font-mono text-[15px] leading-relaxed whitespace-pre-wrap break-words';
   return <div className="flex flex-col gap-3">
-    <div className="relative">
-      <div ref={mirror} aria-hidden className={`${box} pointer-events-none absolute inset-0 overflow-hidden border-transparent text-transparent`}>{pieces}</div>
+    <div>
       <label htmlFor="writer" className="sr-only">Text</label>
       <textarea id="writer" ref={area} value={text} placeholder={placeholder} spellCheck onChange={e => edit(e.target.value)}
-        onScroll={e => { if (mirror.current) mirror.current.scrollTop = e.currentTarget.scrollTop; }}
         className={`${box} ${rows} relative block resize-y border-stone-200 bg-transparent outline-none focus:border-orange-700 dark:border-zinc-800`} />
     </div>
     <div className="flex flex-wrap items-center gap-2">
       <Button onClick={save} disabled={busy} className="rounded-md bg-stone-900 px-4 py-2 text-white hover:bg-orange-700 dark:bg-zinc-100 dark:text-zinc-900">{label}</Button>
+      <Button onClick={autofix} disabled={checking || !text.trim()} className="rounded-md border border-orange-700 px-4 py-2 text-orange-800 hover:bg-orange-700 hover:text-white dark:text-orange-300">Check</Button>
       <Button onClick={dictate} aria-pressed={listening} className={`rounded-md border px-4 py-2 ${listening ? 'border-orange-700 bg-orange-700 text-white' : 'border-stone-300 hover:border-orange-700 dark:border-zinc-700'}`}>{listening ? 'Stop' : 'Dictate'}</Button>
       <Button onClick={() => navigator.clipboard.writeText(text)} className="rounded-md border border-stone-300 px-4 py-2 hover:border-orange-700 dark:border-zinc-700">Copy</Button>
       <PhaseBadge phase={phase} />

@@ -2,16 +2,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Findings, PhaseBadge } from '@/components/findings';
-import { highlight, useN, type Found } from '@/components/use-n';
+import { useN, type Found } from '@/components/use-n';
+import { fixable } from '@/components/fixes';
 import { inlineMd, pageHtml, pageMd, parse, rangeAt, textOf, type Block } from '@/lib/notion-md';
 
-// N's underlines, drawn over the page's text with the CSS Custom Highlight API (the CSS build does not know
-// ::highlight, so it is given to the page as it is).
-const underlines = `::highlight(n-error) { text-decoration: underline wavy #dc2626; text-decoration-thickness: 2px; background-color: color-mix(in srgb, #dc2626 12%, transparent); } ::highlight(n-ambiguous) { text-decoration: underline wavy #ea580c; text-decoration-thickness: 2px; background-color: color-mix(in srgb, #ea580c 12%, transparent); } ::highlight(n-fix) { text-decoration: underline wavy #0284c7; text-decoration-thickness: 2px; background-color: color-mix(in srgb, #0284c7 12%, transparent); } ::highlight(n-jev) { text-decoration: underline wavy #a8a29e; text-decoration-thickness: 2px; }`;
-
 // A Notion page as Notion shows it, written in place: headings, lists, to-dos, bold, italics, links and
-// commented phrases as they are, child pages and anything else shown and kept as they are. N checks it as
-// it is written, underlining each finding in the page. Saving sends Notion only what changed.
+// commented phrases as they are, child pages and anything else shown and kept as they are. Check has N read
+// it. Saving sends Notion only what changed.
 export function NotionPage({ id, title, raw }: { id: string; title: string; raw: string }) {
   const root = useRef<HTMLDivElement>(null);
   const base = useRef(raw); // the page as Notion last gave it
@@ -20,7 +17,7 @@ export function NotionPage({ id, title, raw }: { id: string; title: string; raw:
   const [status, setStatus] = useState(''); const [busy, setBusy] = useState(false);
   const loaded = useRef(false);
   const store = `/api/draft/${encodeURIComponent(`notion:${id}`)}`;
-  const { shown, phase, forget } = useN(text);
+  const { shown, phase, forget, check, busy: checking } = useN(text);
   useEffect(() => { document.title = `${title} · N`; }, [title]);
 
   const render = useCallback((markdown: string) => {
@@ -57,15 +54,6 @@ export function NotionPage({ id, title, raw }: { id: string; title: string; raw:
     return () => window.removeEventListener('pagehide', leave);
   }, [md, idle, store]);
 
-  // N's findings, underlined where they are in the page.
-  useEffect(() => {
-    const el = root.current; const hs = (globalThis as { CSS?: { highlights?: Map<string, unknown> } }).CSS?.highlights;
-    if (!el || !hs || typeof Highlight === 'undefined') return;
-    const { nodes } = textOf(el); const groups: Record<string, Range[]> = {};
-    for (const f of shown) { const r = rangeAt(nodes, f.start, f.end); if (r) (groups[highlight(f)] ??= []).push(r); }
-    for (const name of ['n-jev', 'n-fix', 'n-error', 'n-ambiguous']) hs.set(name, new Highlight(...(groups[name] ?? [])));
-  }, [shown, text]);
-
   const select = (f: Found) => { const el = root.current; if (!el) return null; return rangeAt(textOf(el).nodes, f.start, f.end); };
   const pick = (f: Found) => { const r = select(f); if (!r) return; root.current?.focus(); const s = getSelection(); s?.removeAllRanges(); s?.addRange(r); };
   // A fix replaces only the characters that differ, so the formatting around and inside the phrase stays.
@@ -78,6 +66,16 @@ export function NotionPage({ id, title, raw }: { id: string; title: string; raw:
     el.focus(); const s = getSelection(); s?.removeAllRanges(); s?.addRange(r);
     if (!document.execCommand(put ? 'insertText' : 'delete', false, put)) { r.deleteContents(); if (put) r.insertNode(document.createTextNode(put)); }
     forget(f); sync();
+  };
+
+  // Check: N reads the page now; every fix it is sure of is made, from the end back so each phrase is still
+  // where N found it, and what it cannot fix is left to choose.
+  const autofix = async () => {
+    const el = root.current; if (!el) return;
+    const v = textOf(el).text; const fs = fixable(await check(v));
+    if (textOf(el).text !== v) { setStatus('The page changed while N read it: check again'); return; }
+    for (const f of fs) apply(f, f.new);
+    setStatus(fs.length ? `Fixed ${fs.length}` : '');
   };
 
   const save = async () => {
@@ -123,12 +121,12 @@ export function NotionPage({ id, title, raw }: { id: string; title: string; raw:
   };
 
   return <div className="flex flex-col gap-3">
-    <style>{underlines}</style>
     <div ref={root} contentEditable suppressContentEditableWarning spellCheck role="textbox" aria-multiline aria-label="Page"
       onInput={sync} onClick={tick}
       className="notion min-h-[50vh] rounded-lg border border-stone-200 p-4 text-[16px] leading-relaxed outline-none focus:border-orange-700 dark:border-zinc-800" />
     <div className="flex flex-wrap items-center gap-2">
       <Button onClick={save} disabled={busy} className="rounded-md bg-stone-900 px-4 py-2 text-white hover:bg-orange-700 dark:bg-zinc-100 dark:text-zinc-900">Save</Button>
+      <Button onClick={autofix} disabled={checking || !text.trim()} className="rounded-md border border-orange-700 px-4 py-2 text-orange-800 hover:bg-orange-700 hover:text-white dark:text-orange-300">Check</Button>
       <Button onClick={dictate} aria-pressed={listening} className={`rounded-md border px-4 py-2 ${listening ? 'border-orange-700 bg-orange-700 text-white' : 'border-stone-300 hover:border-orange-700 dark:border-zinc-700'}`}>{listening ? 'Stop' : 'Dictate'}</Button>
       <Button onClick={() => navigator.clipboard.writeText(text)} className="rounded-md border border-stone-300 px-4 py-2 hover:border-orange-700 dark:border-zinc-700">Copy</Button>
       <PhaseBadge phase={phase} />

@@ -25,13 +25,14 @@ def program_step(+entry: String, built: Bool, same: Bool, present: Bool, +from: 
     Bool.pick(List<&2, P.Step>, Bool.not(built), [P.Blocked{what, entry ++ " does not build"}],
       Bool.pick(List<&2, P.Step>, same, [P.Current{"program " ++ program}], [P.Install{from, program}])))
 
+# The agent is current only while its program is as built, its plist as declared, and it is loaded; otherwise it
+# is (re)launched, after its program installs.
 def agent_step(present: Bool, +current: String, loaded: Bool, +home: String, +domain: String, +what: String, a: L.Agent) -> P.Step:
   match a:
     case L.Agent{_, +label, +program, _, _, _, _, _}:
       +want = LO.plist(home, a)
-      Bool.pick(P.Step, Bool.not(present), P.Current{"launch agent " ++ label ++ " (after its program installs)"},
-        Bool.pick(P.Step, String.eq(current, want) && loaded, P.Current{"launch agent " ++ label},
-          P.Launch{label, LO.path(home, label), want, domain}))
+      Bool.pick(P.Step, present && String.eq(current, want) && loaded, P.Current{"launch agent " ++ label},
+        P.Launch{label, LO.path(home, label), want, domain})
 
 def agent_steps(xs: List<&2, L.Agent>, +root: String, +home: String, +domain: String, +socks: List<&2, String>, +what: String) -> IO(List<&2, P.Step>):
   match xs:

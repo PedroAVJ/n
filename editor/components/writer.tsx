@@ -52,7 +52,7 @@ export function Writer({ name, initial, commit, onText }: Props) {
     let stop = false;
     const look = async () => {
       try {
-        const [r, i] = await Promise.all([fetch(`/api/check/${name}`, { cache: 'no-store' }), fetch(`/api/intent/${name}`, { cache: 'no-store' })]);
+        const [r, i] = await Promise.all([fetch(`/api/check/${encodeURIComponent(name)}`, { cache: 'no-store' }), fetch(`/api/intent/${encodeURIComponent(name)}`, { cache: 'no-store' })]);
         const c = await r.json() as Result | null; const is = await i.json() as Array<{ quote: string; intent: string }>;
         if (stop) return;
         setCheck(c); setIntents(Object.fromEntries(is.map(x => [x.quote, x.intent])));
@@ -74,7 +74,7 @@ export function Writer({ name, initial, commit, onText }: Props) {
   };
   const compile = async () => {
     if (!(await save())) return;
-    const r = await fetch(`/api/check/${name}`, { method: 'POST' });
+    const r = await fetch(`/api/check/${encodeURIComponent(name)}`, { method: 'POST' });
     if (!r.ok) { setStatus(await r.text()); return; }
     setCheck(await r.json() as Result); setStatus('');
   };

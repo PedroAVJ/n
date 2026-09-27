@@ -1,7 +1,7 @@
 import { drop, keyOk, read, save } from '@/lib/drafts';
 export const dynamic = 'force-dynamic';
 type Params = { params: Promise<{ key: string }> };
-const bad = () => new Response("A draft's key is letters, digits and :@.-_", { status: 400 });
+const bad = () => new Response("A draft's key is letters, digits, spaces and :@.&-_", { status: 400 });
 
 export async function GET(_: Request, { params }: Params) {
   const key = decodeURIComponent((await params).key);

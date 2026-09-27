@@ -29,7 +29,7 @@ function around(text: string, start: number, end: number) {
 function One({ f, text, name, apply, kept }: { f: Placed; text: string; name: string; apply: (f: Placed, choice: string) => void; kept?: string }) {
   const [intent, setIntent] = useState(kept ?? ''); const [note, setNote] = useState(kept ? 'Kept for the next Check' : '');
   const keep = async (v: string) => {
-    const r = await fetch(`/api/intent/${name}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ quote: f.quote, intent: v }) });
+    const r = await fetch(`/api/intent/${encodeURIComponent(name)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ quote: f.quote, intent: v }) });
     setNote(r.ok ? (v.trim() ? 'Kept for the next Check' : '') : await r.text());
   };
   const { listening, toggle } = useDictation(said => { const v = intent ? `${intent} ${said}` : said; setIntent(v); void keep(v); }, setNote);

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 // Drafts: what is being written and not yet sent or saved, one file per text, named by its key.
 const folder = process.env.N_DRAFTS || join(homedir(), 'Library/Application Support/N/drafts');
-export const keyOk = (key: string) => /^[\w:@.-]{1,200}$/.test(key);
+export const keyOk = (key: string) => /^[\w:@.& -]{1,200}$/.test(key);
 const file = (key: string) => join(folder, `${encodeURIComponent(key)}.txt`);
 
 export async function read(key: string): Promise<string | null> {

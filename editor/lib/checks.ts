@@ -2,7 +2,9 @@ import 'server-only';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { read, save } from './documents';
+import { read, rename as renameFile, save } from './documents';
+import { read as readDraft, save as saveDraft, drop as dropDraft } from './drafts';
+import { rename as renameIn } from 'node:fs/promises';
 import { check, format, type Mark, type Which } from './n';
 
 // Check, as N.n asks for it: all of N at once, in the background. The type check, lint and format run in
@@ -75,4 +77,14 @@ async function run(name: string, r: Result) {
     Object.assign(r, { status: 'done', finished: Date.now() });
   } catch (e) { Object.assign(r, { status: 'failed', error: (e as Error).message, finished: Date.now() }); }
   await put(name, 'result', r);
+}
+
+// A document renamed: its file, its last check, its intents and its draft all move to the new name. Not
+// while a check runs, which would write back under the old name.
+export async function rename(from: string, to: string) {
+  if (running.has(from)) throw Error('N is checking this document: rename it when the check is done');
+  await renameFile(from, to);
+  for (const kind of ['result', 'intents']) await renameIn(at(from, kind), at(to, kind)).catch(() => {});
+  const draft = await readDraft(`doc:${from}`);
+  if (draft !== null) { await saveDraft(`doc:${to}`, draft); await dropDraft(`doc:${from}`); }
 }

@@ -295,9 +295,80 @@ def output(+n: Nat, +body: String) -> String:
       ("hookEventName", str("UserPromptSubmit")),
       ("additionalContext", str("N, the user's type checker for prompts, flagged " ++ count(n) ++ " in this prompt:" ++ body ++ "\nWhere N gives one reading, act on it and name it in one line. Where N lists readings, ask the user its question, naming the readings, before doing anything else."))]))]))
 
-# The hook's answer from Claude's findings.
+# ---- the rewrite: the prompt with each finding's one reading, or its first candidate ----
+def span_of(f: Finding) -> T.Span:
+  match f:
+    case Finding{T.Unconfirmed{_, T.Reading{sp, _}}, _, _, _}:
+      sp
+    case Finding{T.Ambiguous{_, sp, _}, _, _, _}:
+      sp
+    case Finding{T.Inconsistent{_, T.Reading{sp, _}, _, _}, _, _, _}:
+      sp
+
+def span_start(sp: T.Span) -> Nat:
+  match sp:
+    case T.Span{start, _}:
+      start
+
+def span_end(sp: T.Span) -> Nat:
+  match sp:
+    case T.Span{_, end}:
+      end
+
+def start_of(+f: Finding) -> Nat:
+  span_start(span_of(f))
+
+def first_reading(rs: List<&2, T.Reading>, +original: String) -> String:
+  match rs:
+    case []:
+      original
+    case T.Reading{_, t} <> _:
+      t
+
+# What replaces the finding's span: its one reading, its first candidate, or the span as it was.
+def replacement(+prompt: String, f: Finding) -> String:
+  match f:
+    case Finding{T.Unconfirmed{_, T.Reading{_, new}}, _, _, _}:
+      new
+    case Finding{T.Ambiguous{_, +sp, rs}, _, _, _}:
+      first_reading(rs, span_text(prompt, sp))
+    case Finding{T.Inconsistent{_, T.Reading{+sp, _}, _, _}, _, _, _}:
+      span_text(prompt, sp)
+
+def insert(+f: Finding, fs: List<&2, Finding>) -> List<&2, Finding>:
+  match fs:
+    case []:
+      [f]
+    case +g <> +rest:
+      Bool.pick(List<&2, Finding>, Nat.is_le(start_of(f), start_of(g)), f <> g <> rest, g <> insert(f, rest))
+
+def by_start(fs: List<&2, Finding>) -> List<&2, Finding>:
+  match fs:
+    case []:
+      []
+    case f <> rest:
+      insert(f, by_start(rest))
+
+# Walks the findings in order; one that overlaps the previous is left out.
+def rewrite.go(fs: List<&2, Finding>, +prompt: String, +pos: Nat) -> String:
+  match fs:
+    case []:
+      String.drop(prompt, pos)
+    case +f <> +rest:
+      +start = start_of(f)
+      Bool.pick(String, Nat.is_lt(start, pos), rewrite.go(rest, prompt, pos),
+        String.take(String.drop(prompt, pos), Nat.sub(start, pos)) ++ replacement(prompt, f) ++ rewrite.go(rest, prompt, span_end(span_of(f))))
+
+def rewrite(+prompt: String, fs: List<&2, Finding>) -> String:
+  rewrite.go(by_start(fs), prompt, 0n)
+
+# The hook's answer from Claude's findings: the prompt is stopped before the agent reads it, and the
+# person gets N's questions and a rewrite to copy.
 def hook_output(+prompt: String, +fs: List<&2, Finding>) -> String:
-  output(List.length(&2, Finding, fs), finding_lines(prompt, fs))
+  Json.encode(obj([
+    ("decision", str("block")),
+    ("reason", str("N stopped this prompt: " ++ count(List.length(&2, Finding, fs)) ++ " to settle." ++ finding_lines(prompt, fs) ++
+      "\n\nRewritten with N's reading, or the first reading, of each (copy it, or swap in another reading):\n\n" ++ rewrite(prompt, fs)))]))
 
 # The hook's answer from Jev's marks alone, when Claude could not check.
 def jev_output(+ms: List<&2, Mark>) -> String:

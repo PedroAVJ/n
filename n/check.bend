@@ -219,20 +219,21 @@ def to_brace(cs: List<&2, Char>) -> List<&2, Char>:
 def object_in(s: String) -> String:
   String.from_list(List.reverse(&2, Char, to_brace(List.reverse(&2, Char, from_brace(String.to_list(s))))))
 
-def find.go(cs: List<&2, Char>, +needle: String, +i: Nat, hit: Bool) -> Maybe<&2, Nat>:
-  match cs:
-    case []:
+# Where the quote starts in the prompt: the first position where the rest of the text starts with it, found
+# by walking the text itself (rebuilding the rest at each position made this quadratic).
+def find.go(s: String, +needle: String, +i: Nat, hit: Bool) -> Maybe<&2, Nat>:
+  match s:
+    case SNil{}:
       None{}
-    case _ <> +rest:
+    case SCon{_, +rest}:
       match hit:
         case True{}:
           Some{i}
         case False{}:
-          find.go(rest, needle, Nat.add(i, 1n), String.starts_with(String.from_list(rest), needle))
+          find.go(rest, needle, Nat.add(i, 1n), String.starts_with(rest, needle))
 
-# Where the quote starts in the prompt.
 def find(+hay: String, +needle: String) -> Maybe<&2, Nat>:
-  Bool.pick(Maybe<&2, Nat>, String.is_empty(needle), None{}, find.go(String.to_list(hay), needle, 0n, String.starts_with(hay, needle)))
+  Bool.pick(Maybe<&2, Nat>, String.is_empty(needle), None{}, find.go(hay, needle, 0n, String.starts_with(hay, needle)))
 
 def strings.go(vs: List<&2, Json.Val>) -> List<&2, String>:
   match vs:

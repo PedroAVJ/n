@@ -4,9 +4,9 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { query, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 
-// N check: N's whole-document checker prompt (the type check, lint and format N.n defines), answered by
-// Claude Opus on the owner's Claude subscription through one warm Agent SDK session, and read back into
-// marks by N's binary.
+// N's checks: the type check, lint and format N.n defines, each N's binary's prompt answered by Claude
+// Opus on the owner's Claude subscription through one warm Agent SDK session, and read back into marks by
+// N's binary.
 export type Mark = { start: number; end: number; level: string; why: string; question: string; fixable: boolean; new: string; options: string[] };
 export type Review = { marks: Mark[]; assessor: string; seconds: number };
 
@@ -76,9 +76,11 @@ function within<T>(ms: number, p: Promise<T>): Promise<T> {
   return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => { checker?.close(); checker = null; reject(Error('N check took over two minutes')); }, ms))]);
 }
 
-export async function check(text: string): Promise<Review> {
+// One of N's three checks, as N.n orders them: the type check, lint, then format.
+export type Which = 'type' | 'lint' | 'format';
+export async function check(text: string, which: Which): Promise<Review> {
   const started = Date.now();
-  const prompt = await runN(['prompt'], { text });
+  const prompt = await runN(['prompt'], { text, check: which });
   const answer = await within(120000, claude(prompt));
   const r = JSON.parse(await runN(['read'], { text, answer })) as { marks: Mark[] };
   return { marks: inUnits(text, r.marks), assessor: 'Claude Opus 5.5', seconds: (Date.now() - started) / 1000 };

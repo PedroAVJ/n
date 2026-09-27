@@ -1,9 +1,9 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { useN, type Found } from './use-n';
+import { names, useN, type Found, type Which } from './use-n';
 import { fixable } from './fixes';
-import { Findings, PhaseBadge } from './findings';
+import { Checks, Findings } from './findings';
 
 // Writing, checked by N when asked: Check makes every fix N is sure of and lists what it cannot fix, whose
 // readings replace the phrase when chosen. `commit` saves the text.
@@ -43,18 +43,26 @@ export function Writer({ draft, initial, commit, label, rows = 'h-[60vh]', onTex
     return () => window.removeEventListener('pagehide', leave);
   }, [text, idle, store]);
 
-  const { shown, phase, forget, check, busy: checking } = useN(text);
-  // Check: N reads the text now; every fix it is sure of is made, from the end back so each phrase is
-  // still where N found it, and what it cannot fix is left to choose.
-  const autofix = async () => {
-    const v = text; const fs = fixable(await check(v));
-    if (latest.current !== v) { setStatus('The text changed while N read it: check again'); return; }
-    let next = v; for (const f of fs) next = next.slice(0, f.start) + f.new + next.slice(f.end);
-    if (fs.length) { setText(next); fs.forEach(forget); }
-    setStatus(fs.length ? `Fixed ${fs.length}` : '');
+  const { shown, running, error, done, unlocked, pass, keep, run, forget, current } = useN(text);
+  // One of N's checks: it makes every fix it is sure of, from the end back so each phrase is still where N
+  // found it; with nothing left to choose, the check passes and the next one unlocks.
+  const check = async (w: Which) => {
+    const v = text; const fs = await run(w, v); if (!fs) return;
+    if (latest.current !== v) { setStatus('The text changed while N read it: run it again'); return; }
+    const fix = fixable(fs); let next = v;
+    for (const f of fix) next = next.slice(0, f.start) + f.new + next.slice(f.end);
+    if (fix.length) { setText(next); fix.forEach(forget); }
+    const left = fs.length - fix.length;
+    if (!left) pass(w, next);
+    setStatus(`${names[w]}: ${fix.length ? `fixed ${fix.length}` : 'nothing to fix'}${left ? `, ${left} to choose` : ', passed'}`);
   };
   const edit = (v: string) => { setText(v); setStatus(''); };
-  const apply = (f: Found, choice: string) => { const next = text.slice(0, f.start) + choice + text.slice(f.end); setText(next); forget(f); area.current?.focus(); };
+  // A reading or the writer's own rewrite replaces the phrase; the last one chosen passes the check.
+  const apply = (f: Found, choice: string) => {
+    const next = text.slice(0, f.start) + choice + text.slice(f.end); setText(next); forget(f);
+    if (current && shown.length === 1) { pass(current, next); setStatus(`${names[current]}: passed`); } else keep(text, next);
+    area.current?.focus();
+  };
   const pick = (f: Found) => { const a = area.current; if (!a) return; a.focus(); a.setSelectionRange(f.start, f.end); };
   const save = async () => {
     const v = text; if (busy || v === base) return;
@@ -94,12 +102,12 @@ export function Writer({ draft, initial, commit, label, rows = 'h-[60vh]', onTex
       <textarea id="writer" ref={area} value={text} spellCheck onChange={e => edit(e.target.value)}
         className={`${box} ${rows} relative block resize-y border-stone-200 bg-transparent outline-none focus:border-orange-700 dark:border-zinc-800`} />
     </div>
+    <Checks done={done} unlocked={unlocked} running={running} run={check} />
+    {error && <p role="alert" className="text-sm text-red-700 dark:text-red-400">{error}</p>}
     <div className="flex flex-wrap items-center gap-2">
       <Button onClick={save} disabled={busy} className="rounded-md bg-stone-900 px-4 py-2 text-white hover:bg-orange-700 dark:bg-zinc-100 dark:text-zinc-900">{label}</Button>
-      <Button onClick={autofix} disabled={checking || !text.trim()} className="rounded-md border border-orange-700 px-4 py-2 text-orange-800 hover:bg-orange-700 hover:text-white dark:text-orange-300">Check</Button>
       <Button onClick={dictate} aria-pressed={listening} className={`rounded-md border px-4 py-2 ${listening ? 'border-orange-700 bg-orange-700 text-white' : 'border-stone-300 hover:border-orange-700 dark:border-zinc-700'}`}>{listening ? 'Stop' : 'Dictate'}</Button>
       <Button onClick={() => navigator.clipboard.writeText(text)} className="rounded-md border border-stone-300 px-4 py-2 hover:border-orange-700 dark:border-zinc-700">Copy</Button>
-      <PhaseBadge phase={phase} />
       <span className="text-sm text-stone-500 dark:text-zinc-400">{[text !== base ? 'Unsaved' : '', status].filter(Boolean).join(' · ')}</span>
     </div>
     <Findings shown={shown} pick={pick} apply={apply} />

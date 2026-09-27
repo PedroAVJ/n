@@ -199,7 +199,7 @@ def screen(+text: String) -> IO(H.Response):
 
 def deep(+text: String) -> IO(H.Response):
   do IO<H.Response>:
-    out : String <- E.claude(C.document_prompt(text))
+    out : String <- E.claude(C.type_prompt(text))
     return fragment(finding_cards(text, C.findings(C.text(C.at(Json.parse(out), "result")), text)))
 
 # ---- documents: .n files in one folder, named by letters, digits, - and _ ----

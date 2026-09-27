@@ -23,7 +23,7 @@ def model() -> String:
   "typesafe/jev-1.13"
 
 def version() -> Pl.Version:
-  Pl.Version{0n, 7n, 0n}
+  Pl.Version{0n, 8n, 0n}
 
 # ---- the hook ----
 # Jev screens every phrase; Claude runs N4's checker on what Jev flagged and gives each finding its one
@@ -154,11 +154,16 @@ def screen(+item: String) -> IO(Unit):
     +k : String <- E.key(item)
     jev_screen(String.is_empty(k), k, C.text(C.at(v, "conversation")), C.text(C.at(v, "text")))
 
-# N's whole-document checker prompt for {text} on stdin, for a caller that asks Claude itself.
+# N's checker prompt for {text, check} on stdin, for a caller that asks Claude itself: check is "type",
+# "lint" or "format".
 def prompt() -> IO(Unit):
   do IO<Unit>:
     input : String <- E.stdin()
-    IO.print(C.document_prompt(C.text(C.at(Json.parse(input), "text"))))
+    +v : Maybe<&2, Json.Val> = Json.parse(input)
+    +which : String = C.text(C.at(v, "check"))
+    +text : String = C.text(C.at(v, "text"))
+    IO.print(Bool.pick(String, String.eq(which, "lint"), C.lint_prompt(text),
+      Bool.pick(String, String.eq(which, "format"), C.format_prompt(text), C.type_prompt(text))))
 
 def read() -> IO(Unit):
   do IO<Unit>:

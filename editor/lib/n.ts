@@ -73,7 +73,7 @@ function claude(prompt: string): Promise<string> {
 
 // A check that has not answered in two minutes has failed; the session is replaced for the next one.
 function within<T>(ms: number, p: Promise<T>): Promise<T> {
-  return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => { checker?.close(); checker = null; reject(Error('N check took over two minutes')); }, ms))]);
+  return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => { checker?.close(); checker = null; reject(Error(`N took over ${ms / 60000} minutes`)); }, ms))]);
 }
 
 // One of N's three checks: the type check, lint or format, given what the author said they meant about
@@ -85,4 +85,14 @@ export async function check(text: string, which: Which, intents: string[] = [], 
   const answer = await within(120000, claude(prompt));
   const r = JSON.parse(await runN(['read'], { text, answer })) as { marks: Mark[] };
   return { marks: inUnits(text, r.marks), assessor: 'Claude Opus 5.5', seconds: (Date.now() - started) / 1000 };
+}
+
+// Format: N's formatter prompt answered with the whole text formatted again.
+export async function format(text: string, intents: string[] = [], isolate: string[] = []): Promise<string> {
+  const prompt = await runN(['prompt'], { text, check: 'format', intents, isolate });
+  const answer = await within(300000, claude(prompt));
+  const json = answer.slice(answer.indexOf('{'), answer.lastIndexOf('}') + 1);
+  const out = (JSON.parse(json) as { text?: unknown }).text;
+  if (typeof out !== 'string' || !out.trim()) throw Error('N format answered no text');
+  return out;
 }

@@ -3,15 +3,16 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { read, save } from './documents';
-import { check, type Mark, type Which } from './n';
+import { check, format, type Mark, type Which } from './n';
 
 // Check, as N.n asks for it: all of N at once, in the background. The type check, lint and format run in
-// turn on the saved document; each makes every fix it is sure of, and later checks work around what the
-// type check left wrong. What is left is a list of errors (type) and warnings (lint). The fixed text is
+// turn on the saved document: the type check and lint make every fix they are sure of, format prints the
+// whole text again, and later checks work around what the type check left wrong. What is left is a list
+// of errors (type) and warnings (lint). The fixed text is
 // written back while the document is as it was when the check began. A check keeps running with no page
 // open, and its result waits in N/checks for the page to come back.
 export type Finding = Mark & { quote: string };
-export type Result = { status: 'running' | 'done' | 'failed'; base: string; text: string; fixed: number; errors: Finding[]; warnings: Finding[]; error: string; started: number; finished: number };
+export type Result = { status: 'running' | 'done' | 'failed'; base: string; text: string; fixed: number; formatted?: boolean; errors: Finding[]; warnings: Finding[]; error: string; started: number; finished: number };
 export type Intent = { quote: string; intent: string };
 
 const folder = process.env.N_CHECKS || join(homedir(), 'Library/Application Support/N/checks');
@@ -43,7 +44,7 @@ export async function start(name: string): Promise<Result | null> {
 async function run(name: string, r: Result) {
   try {
     const wanted = (await intents(name)).map(i => `"${i.quote}": ${i.intent}`);
-    let text = r.base; const unparsed: string[] = [];
+    let text = r.base;
     // One pass of a check: every fix it is sure of made, from the end back so each phrase is still where N
     // found it (one overlapping a fix already made is left out); what it cannot fix is returned.
     const pass = async (which: Which, isolate: string[]) => {
@@ -55,17 +56,21 @@ async function run(name: string, r: Result) {
       r.fixed += fix.length; r.text = text; await put(name, 'result', r);
       return { fixed: fix.length, left: found.filter(f => !fix.includes(f)) };
     };
-    // Type check; lint around what the type check left wrong; then format, which works around only what
-    // could not be understood, in passes until it has nothing left to fix.
+    // The type check and lint fix what they are sure of; format prints the whole text again around what the
+    // type check could not fix; then the type check and lint run once more, on the formatted text, and what
+    // they cannot fix is the list of errors and warnings.
+    const first = await pass('type', []);
+    const unparsed = first.left.map(f => f.quote);
+    await pass('lint', unparsed);
+    const formatted = await format(text, wanted, unparsed);
+    // Kept only if every span the type check could not fix is still there as it was, and most of the text
+    // was not dropped.
+    if (unparsed.every(q => formatted.includes(q)) && formatted.length >= text.length * 0.25 && formatted !== text) { r.fixed += 1; text = formatted; r.formatted = true; }
+    r.text = text; await put(name, 'result', r);
     const typed = await pass('type', []);
-    r.errors.push(...typed.left); unparsed.push(...typed.left.map(f => f.quote));
-    const linted = await pass('lint', unparsed);
-    r.warnings.push(...linted.left);
-    for (let i = 0; i < 3; i++) {
-      const formatted = await pass('format', unparsed);
-      r.warnings.push(...formatted.left);
-      if (!formatted.fixed) break;
-    }
+    r.errors = typed.left;
+    const linted = await pass('lint', typed.left.map(f => f.quote));
+    r.warnings = linted.left;
     if (text !== r.base && (await read(name)) === r.base) await save(name, text);
     Object.assign(r, { status: 'done', finished: Date.now() });
   } catch (e) { Object.assign(r, { status: 'failed', error: (e as Error).message, finished: Date.now() }); }

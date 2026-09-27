@@ -26,6 +26,8 @@ export function Writer({ context = '', initial, commit, label, clears, rows = 'h
   const [text, setText] = useState(initial); const [base, setBase] = useState(initial);
   const [found, setFound] = useState<Found[]>([]); const [by, setBy] = useState(''); const [checking, setChecking] = useState(false);
   const [status, setStatus] = useState(''); const [busy, setBusy] = useState(false);
+  // What N last answered for: the text it read and how many findings it had, or why it failed.
+  const [answered, setAnswered] = useState<{ text: string; count: number; error: string }>({ text: '', count: 0, error: '' });
   const [listening, setListening] = useState(false); const recorder = useRef<MediaRecorder | null>(null);
   const area = useRef<HTMLTextAreaElement>(null); const mirror = useRef<HTMLDivElement>(null);
   const latest = useRef(text); latest.current = text;
@@ -51,8 +53,8 @@ export function Writer({ context = '', initial, commit, label, clears, rows = 'h
       try { const r = await fetch('/api/check', ask(v)); const out = await r.json() as Review & { error?: string };
         if (!r.ok) throw Error(out.error || 'N check failed');
         setFound(place(latest.current, read(v, out))); setBy('N'); byN.current = true;
-        if (latest.current === v) setStatus(out.marks.length ? `${out.marks.length} to settle` : 'One reading throughout');
-      } catch (e) { setStatus((e as Error).message); } finally { setChecking(false); }
+        setAnswered({ text: v, count: out.marks.length, error: '' });
+      } catch (e) { setAnswered({ text: v, count: 0, error: (e as Error).message }); } finally { setChecking(false); }
     }, 2500);
     return () => { clearTimeout(jev); clearTimeout(n); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -100,7 +102,14 @@ export function Writer({ context = '', initial, commit, label, clears, rows = 'h
   for (const f of shown) { pieces.push(text.slice(at, f.start)); pieces.push(<mark key={f.start} className={`bg-transparent text-transparent underline decoration-wavy decoration-2 underline-offset-4 ${tone(f)}`}>{text.slice(f.start, f.end)}</mark>); at = f.end; }
   pieces.push(text.slice(at) + '\n');
   const box = 'w-full rounded-lg border p-4 font-mono text-[15px] leading-relaxed whitespace-pre-wrap break-words';
-  const state = checking ? 'N is reading…' : shown.some(f => f.jev) ? 'Grey: Jev flagged it; N gives the readings' : '';
+  // N's state for the text as it is now: waiting for a pause, reading, passed, findings to settle, or failed.
+  const settle = shown.filter(f => !f.jev).length;
+  const phase = !text.trim() ? null
+    : checking ? { tone: 'bg-stone-200 text-stone-700 dark:bg-zinc-800 dark:text-zinc-300', label: 'N is reading…', spin: true }
+    : answered.text === text && answered.error ? { tone: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300', label: `N failed: ${answered.error}`, spin: false }
+    : answered.text === text && !settle ? { tone: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300', label: '✓ One reading', spin: false }
+    : answered.text === text ? { tone: 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300', label: `${settle} to settle`, spin: false }
+    : { tone: 'bg-stone-200 text-stone-700 dark:bg-zinc-800 dark:text-zinc-300', label: shown.some(f => f.jev) ? 'Jev flagged these · N reads when you pause' : 'N reads when you pause', spin: false };
 
   return <div className="flex flex-col gap-3">
     <div className="relative">
@@ -114,7 +123,9 @@ export function Writer({ context = '', initial, commit, label, clears, rows = 'h
       <Button onClick={save} disabled={busy} className="rounded-md bg-stone-900 px-4 py-2 text-white hover:bg-orange-700 dark:bg-zinc-100 dark:text-zinc-900">{label}</Button>
       <Button onClick={dictate} aria-pressed={listening} className={`rounded-md border px-4 py-2 ${listening ? 'border-orange-700 bg-orange-700 text-white' : 'border-stone-300 hover:border-orange-700 dark:border-zinc-700'}`}>{listening ? 'Stop' : 'Dictate'}</Button>
       <Button onClick={() => navigator.clipboard.writeText(text)} className="rounded-md border border-stone-300 px-4 py-2 hover:border-orange-700 dark:border-zinc-700">Copy</Button>
-      <span role="status" className="text-sm text-stone-500 dark:text-zinc-400">{[!clears && text !== base ? 'Unsaved' : '', state, status].filter(Boolean).join(' · ')}</span>
+      {phase && <span role="status" aria-live="polite" className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${phase.tone}`}>
+        {phase.spin && <span aria-hidden className="size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />}{phase.label}</span>}
+      <span className="text-sm text-stone-500 dark:text-zinc-400">{[!clears && text !== base ? 'Unsaved' : '', status].filter(Boolean).join(' · ')}</span>
     </div>
     {shown.length > 0 && <section aria-live="polite" className="flex flex-col gap-2">
       {shown.map(f => { const choices = [...new Set([...(f.fixable && f.new ? [f.new] : []), ...(f.options || [])])];

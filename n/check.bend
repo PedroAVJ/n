@@ -110,15 +110,34 @@ def at(m: Maybe<&2, Json.Val>, k: String) -> Maybe<&2, Json.Val>:
     case None{}:
       None{}
 
-def mark(+choice: String, p: Phrase, +out: List<&2, Mark>) -> List<&2, Mark>:
-  Bool.pick(List<&2, Mark>, String.is_empty(choice) || String.eq(choice, "clear"), out, Mark{p, choice} <> out)
+# A probability as hundredths: "0.39" is 39.
+def number(m: Maybe<&2, Json.Val>) -> String:
+  match m:
+    case Some{Json.Num{s}}:
+      s
+    case _:
+      "0"
+
+def hundredths(+s: String) -> U32:
+  +whole = Maybe.default(&2, U32, U32.read(Maybe.default(&2, String, List.head(&2, String, String.split(s, '.')), "0")), 0)
+  +frac = Maybe.default(&2, String, List.get(&2, String, String.split(s, '.'), 1n), "")
+  (whole * 100 + Maybe.default(&2, U32, U32.read(String.take(frac ++ "00", 2n)), 0) : U32)
+
+# Jev's flag counts only while it gives "clear" less than this, in hundredths: below it, Jev is unsure
+# enough that a clear prompt gets flagged.
+def clear_below() -> U32:
+  35
+
+def mark(+choice: String, +clear: U32, p: Phrase, +out: List<&2, Mark>) -> List<&2, Mark>:
+  Bool.pick(List<&2, Mark>, String.is_empty(choice) || String.eq(choice, "clear") || U32.is_ge(clear, clear_below()), out, Mark{p, choice} <> out)
 
 def marks.go(ps: List<&2, Phrase>, +answers: Maybe<&2, Json.Val>, +i: Nat) -> List<&2, Mark>:
   match ps:
     case []:
       []
     case p <> rest:
-      mark(text(at(at(answers, key(i)), "choice")), p, marks.go(rest, answers, Nat.add(i, 1n)))
+      mark(text(at(at(answers, key(i)), "choice")), hundredths(number(at(at(at(answers, key(i)), "probabilities"), "clear"))), p,
+        marks.go(rest, answers, Nat.add(i, 1n)))
 
 # The phrases Jev did not find clear. An answer that is not Jev's leaves every phrase unmarked.
 def marks(+response: String, ps: List<&2, Phrase>) -> List<&2, Mark>:
@@ -238,10 +257,10 @@ def annotations(m: Maybe<&2, Json.Val>) -> List<&2, Json.Val>:
     case _:
       []
 
-# The findings in Claude's answer whose quote is in the prompt. Low-level lint is dropped: on a prompt
-# it is noise.
-def findings(+claude_out: String, +prompt: String) -> List<&2, Finding>:
-  findings.go(annotations(at(Json.parse(object_in(text(at(Json.parse(claude_out), "result")))), "annotations")), prompt)
+# The findings in a model's answer text whose quote is in the prompt. Low-level lint is dropped: on a
+# prompt it is noise.
+def findings(+answer: String, +prompt: String) -> List<&2, Finding>:
+  findings.go(annotations(at(Json.parse(object_in(answer)), "annotations")), prompt)
 
 # ---- what the agent is told ----
 def why(+issue: String) -> String:
@@ -373,3 +392,66 @@ def hook_output(+prompt: String, +fs: List<&2, Finding>) -> String:
 # The hook's answer from Jev's marks alone, when Claude could not check.
 def jev_output(+ms: List<&2, Mark>) -> String:
   output(List.length(&2, Mark, ms), lines(ms))
+
+# ---- Near's review: the marks its composer shows, each with its question and readings ----
+def issue_level(+issue: String) -> String:
+  Bool.pick(String, String.eq(issue, "ambiguous"), "high", Bool.pick(String, String.eq(issue, "missing"), "medium", "error"))
+
+def issue_question(+issue: String) -> String:
+  Bool.pick(String, String.eq(issue, "ambiguous"), "Which meaning do you intend?",
+    Bool.pick(String, String.eq(issue, "missing"), "Which specific choice or referent do you mean?",
+      Bool.pick(String, String.eq(issue, "conflicting"), "Which statement should control?", "How should this phrase be worded?")))
+
+def strs(xs: List<&2, String>) -> List<&2, Json.Val>:
+  match xs:
+    case []:
+      []
+    case x <> rest:
+      Json.Str{x} <> strs(rest)
+
+def near_mark(+start: Nat, +end: Nat, +level: String, +why: String, +question: String, fixable: Bool, +new: String, options: List<&2, String>) -> Json.Val:
+  obj([
+    ("start", Json.Num{Nat.show(start)}), ("end", Json.Num{Nat.show(end)}), ("level", str(level)), ("why", str(why)),
+    ("question", str(question)), ("fixable", Json.Flag{fixable}), ("new", str(new)), ("options", Json.Arr{strs(options)})])
+
+# A phrase's span without the whitespace around it.
+def trimmed_start(+prompt: String, +start: Nat, +t: String) -> Nat:
+  Nat.add(start, Maybe.default(&2, Nat, find(String.drop(prompt, start), t), 0n))
+
+def jev_marks(+prompt: String, ms: List<&2, Mark>) -> List<&2, Json.Val>:
+  match ms:
+    case []:
+      []
+    case Mark{Phrase{T.Span{start, _}, +t}, +issue} <> rest:
+      +s = trimmed_start(prompt, start, t)
+      near_mark(s, Nat.add(s, String.length(t)), issue_level(issue), why(issue), issue_question(issue), False{}, "", []) <> jev_marks(prompt, rest)
+
+def reading_texts(rs: List<&2, T.Reading>) -> List<&2, String>:
+  match rs:
+    case []:
+      []
+    case T.Reading{_, t} <> rest:
+      t <> reading_texts(rest)
+
+def finding_mark(f: Finding) -> Json.Val:
+  match f:
+    case Finding{T.Unconfirmed{_, T.Reading{T.Span{start, end}, new}}, level, why, question}:
+      near_mark(start, end, level, why, question, True{}, new, [])
+    case Finding{T.Ambiguous{_, T.Span{start, end}, rs}, level, why, question}:
+      near_mark(start, end, level, why, question, False{}, "", reading_texts(rs))
+    case Finding{T.Inconsistent{_, T.Reading{T.Span{start, end}, _}, _, _}, level, why, question}:
+      near_mark(start, end, level, why, question, False{}, "", [])
+
+def finding_marks(fs: List<&2, Finding>) -> List<&2, Json.Val>:
+  match fs:
+    case []:
+      []
+    case f <> rest:
+      finding_mark(f) <> finding_marks(rest)
+
+def review(+assessor: String, marks: List<&2, Json.Val>) -> String:
+  Json.encode(obj([("marks", Json.Arr{marks}), ("assessor", str(assessor)), ("stats", obj([("seconds", Json.Num{"0"})]))]))
+
+# Jev's review, with the checker prompt for the deep check: what Jev flagged goes first.
+def screened(+assessor: String, marks: List<&2, Json.Val>, +deep: String) -> String:
+  Json.encode(obj([("marks", Json.Arr{marks}), ("assessor", str(assessor)), ("stats", obj([("seconds", Json.Num{"0"})])), ("prompt", str(deep))]))

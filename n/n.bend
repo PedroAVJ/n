@@ -42,7 +42,7 @@ def unchecked(+ms: List<&2, C.Mark>) -> IO(Unit):
   said(List.is_empty(&2, C.Mark, ms), C.jev_output(ms))
 
 def claude_said(+out: String, +prompt: String, +ms: List<&2, C.Mark>) -> IO(Unit):
-  Bool.pick(IO(Unit), String.is_empty(out), unchecked(ms), found(prompt, C.findings(out, prompt)))
+  Bool.pick(IO(Unit), String.is_empty(out), unchecked(ms), found(prompt, C.findings(C.text(C.at(Json.parse(out), "result")), prompt)))
 
 def flagged(ms: List<&2, C.Mark>) -> List<&2, C.Phrase>:
   match ms:
@@ -130,6 +130,35 @@ def dryrun(+item: String) -> IO(Unit):
     IO.print(C.checker_prompt(conversation, prompt, []))
     IO.print("Nothing was sent.")
 
+# ---- Near's composer: Jev's screen, then the deep check on the person's own Claude ----
+#   n screen [item]   {text, conversation} on stdin: Jev's marks, and the checker prompt for Claude
+#   n read            {text, answer} on stdin: the marks in Claude's answer
+def jev_screen(no_key: Bool, +k: String, +conversation: String, +text: String) -> IO(Unit):
+  match no_key:
+    case True{}:
+      IO.print(C.screened("none", [], C.checker_prompt(conversation, text, [])))
+    case False{}:
+      do IO<Unit>:
+        u : String <- E.env("N_CHECK_URL")
+        +ps : List<&2, C.Phrase> = C.phrases(text)
+        response : String <- E.ask(url(u), k, Json.encode(C.request(model(), conversation, text, ps)))
+        +ms : List<&2, C.Mark> = C.marks(response, ps)
+        IO.print(C.screened("Jev", C.jev_marks(text, ms), C.checker_prompt(conversation, text, flagged(ms))))
+
+def screen(+item: String) -> IO(Unit):
+  do IO<Unit>:
+    input : String <- E.stdin()
+    +v : Maybe<&2, Json.Val> = Json.parse(input)
+    +k : String <- E.key(item)
+    jev_screen(String.is_empty(k), k, C.text(C.at(v, "conversation")), C.text(C.at(v, "text")))
+
+def read() -> IO(Unit):
+  do IO<Unit>:
+    input : String <- E.stdin()
+    +v : Maybe<&2, Json.Val> = Json.parse(input)
+    +text : String = C.text(C.at(v, "text"))
+    IO.print(C.review("Claude", C.finding_marks(C.findings(C.text(C.at(v, "answer")), text))))
+
 # ---- the plugin ----
 # N for Claude Code and Codex, from one folder: both run the same bin/n on each prompt.
 def package() -> Pl.Package:
@@ -164,10 +193,12 @@ def plugin(+dir: String) -> IO(Unit):
 
 # ---- the command line ----
 def command(+c: String, +arg: String) -> IO(Unit):
+  Bool.pick(IO(Unit), String.eq(c, "screen"), screen(arg),
+  Bool.pick(IO(Unit), String.eq(c, "read"), read(),
   Bool.pick(IO(Unit), String.eq(c, "dryrun"), dryrun(arg),
     Bool.pick(IO(Unit), String.eq(c, "plugin") && Bool.not(String.is_empty(arg)), plugin(arg),
       Bool.pick(IO(Unit), String.eq(c, "hook") || String.is_empty(c), hook(arg),
-        IO.print("usage: n hook [keychain item] | n dryrun [keychain item] | n plugin <dir>"))))
+        IO.print("usage: n screen [keychain item] | n read | n hook [keychain item] | n dryrun [keychain item] | n plugin <dir>"))))))
 
 def dispatch(xs: List<&1, String>) -> IO(Unit):
   match xs:

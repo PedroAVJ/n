@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { Finding } from '@/lib/checks';
+import { segments } from '@/lib/pages';
 import { useDictation } from './dictation';
 
 // A finding follows its phrase while the text around it changes, and is dropped once the phrase is gone.
@@ -26,10 +27,10 @@ function around(text: string, start: number, end: number) {
 // An error or a warning: where it is, its phrase, N's question and reason, its
 // suggestions, any of which replaces the phrase, and the author's intent, typed or dictated, which the next
 // Check takes into account.
-function One({ f, text, name, apply, kept }: { f: Placed; text: string; name: string; apply: (f: Placed, choice: string) => void; kept?: string }) {
+function One({ f, text, id, apply, kept }: { f: Placed; text: string; id: string; apply: (f: Placed, choice: string) => void; kept?: string }) {
   const [intent, setIntent] = useState(kept ?? ''); const [note, setNote] = useState(kept ? 'Kept for the next Check' : '');
   const keep = async (v: string) => {
-    const r = await fetch(`/api/intent/${encodeURIComponent(name)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ quote: f.quote, intent: v }) });
+    const r = await fetch(`/api/intent/${segments(id)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ quote: f.quote, intent: v }) });
     setNote(r.ok ? (v.trim() ? 'Kept for the next Check' : '') : await r.text());
   };
   const { listening, toggle } = useDictation(said => { const v = intent ? `${intent} ${said}` : said; setIntent(v); void keep(v); }, setNote);
@@ -58,7 +59,7 @@ function One({ f, text, name, apply, kept }: { f: Placed; text: string; name: st
 
 // View mode: the text as it reads, each error under a red squiggle and each warning under an orange one.
 // Tapping one opens it below, with where it is, its suggestions and the box for what the author means.
-export function Squiggles({ text, shown, name, apply, intents }: { text: string; shown: Placed[]; name: string; apply: (f: Placed, choice: string) => void; intents: Record<string, string> }) {
+export function Squiggles({ text, shown, id, apply, intents }: { text: string; shown: Placed[]; id: string; apply: (f: Placed, choice: string) => void; intents: Record<string, string> }) {
   const [open, setOpen] = useState<string | null>(null);
   const pieces: React.ReactNode[] = []; let at = 0;
   for (const f of shown) {
@@ -75,7 +76,7 @@ export function Squiggles({ text, shown, name, apply, intents }: { text: string;
     <div className="min-h-[50vh] whitespace-pre-wrap break-words rounded-lg border border-stone-200 p-4 text-[16px] leading-relaxed dark:border-zinc-800">{pieces}</div>
     {chosen && <div className="sticky bottom-2 max-h-[60vh] overflow-y-auto rounded-lg bg-stone-50 shadow-lg dark:bg-zinc-950">
       <div className="flex justify-end"><button onClick={() => setOpen(null)} className="px-3 py-1 text-sm text-stone-500 hover:text-orange-700">Close</button></div>
-      <One f={chosen} text={text} name={name} apply={(f, c) => { apply(f, c); setOpen(null); }} kept={intents[chosen.quote]} />
+      <One f={chosen} text={text} id={id} apply={(f, c) => { apply(f, c); setOpen(null); }} kept={intents[chosen.quote]} />
     </div>}
   </div>;
 }

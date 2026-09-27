@@ -1,10 +1,9 @@
 import 'server-only';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename as renameIn, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { read, rename as renameFile, save } from './documents';
-import { read as readDraft, save as saveDraft, drop as dropDraft } from './drafts';
-import { rename as renameIn } from 'node:fs/promises';
+import { drop as dropDraft, keys as draftKeys, read as readDraft, save as saveDraft } from './drafts';
 import { check, format, type Mark, type Which } from './n';
 
 // Check, as N.n asks for it: all of N at once, in the background. The type check, lint and format run in
@@ -18,9 +17,10 @@ export type Result = { status: 'running' | 'done' | 'failed'; base: string; text
 export type Intent = { quote: string; intent: string };
 
 const folder = process.env.N_CHECKS || join(homedir(), 'Library/Application Support/N/checks');
-const at = (name: string, kind: string) => join(folder, `${name}.${kind}.json`);
+// A page's check and intents sit at its path in N/checks, the pages under it in the folder beside them.
+const at = (id: string, kind: string) => join(folder, ...id.split('/')) + `.${kind}.json`;
 async function get<T>(name: string, kind: string, none: T): Promise<T> { try { return JSON.parse(await readFile(at(name, kind), 'utf8')); } catch { return none; } }
-async function put(name: string, kind: string, value: unknown) { await mkdir(folder, { recursive: true }); await writeFile(at(name, kind), JSON.stringify(value)); }
+async function put(name: string, kind: string, value: unknown) { await mkdir(dirname(at(name, kind)), { recursive: true }); await writeFile(at(name, kind), JSON.stringify(value)); }
 
 export const result = (name: string) => get<Result | null>(name, 'result', null);
 export const intents = (name: string) => get<Intent[]>(name, 'intents', []);
@@ -79,12 +79,19 @@ async function run(name: string, r: Result) {
   await put(name, 'result', r);
 }
 
-// A document renamed: its file, its last check, its intents and its draft all move to the new name. Not
-// while a check runs, which would write back under the old name.
-export async function rename(from: string, to: string) {
-  if (running.has(from)) throw Error('N is checking this document: rename it when the check is done');
-  await renameFile(from, to);
-  for (const kind of ['result', 'intents']) await renameIn(at(from, kind), at(to, kind)).catch(() => {});
-  const draft = await readDraft(`doc:${from}`);
-  if (draft !== null) { await saveDraft(`doc:${to}`, draft); await dropDraft(`doc:${from}`); }
+// A page renamed: its file and the pages under it move, and so do their checks, intents and drafts; the
+// answer is its new id. Not while a check runs on it or under it, which would write back under the old name.
+export async function rename(id: string, name: string) {
+  if ([...running].some(r => r === id || r.startsWith(`${id}/`))) throw Error('N is checking this page: rename it when the check is done');
+  const to = await renameFile(id, name);
+  for (const kind of ['result', 'intents']) await renameIn(at(id, kind), at(to, kind)).catch(() => {});
+  await renameIn(join(folder, ...id.split('/')), join(folder, ...to.split('/'))).catch(() => {});
+  for (const key of await draftKeys()) {
+    const page = key.startsWith('doc:') ? key.slice(4) : null;
+    if (page === null || (page !== id && !page.startsWith(`${id}/`))) continue;
+    const draft = await readDraft(key);
+    if (draft !== null) await saveDraft(`doc:${to}${page.slice(id.length)}`, draft);
+    await dropDraft(key);
+  }
+  return to;
 }

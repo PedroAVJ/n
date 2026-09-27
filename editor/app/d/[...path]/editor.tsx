@@ -3,28 +3,36 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { PageList } from '@/components/page-list';
 import { Writer } from '@/components/writer';
+import { ancestors, href, nameOf, segments } from '@/lib/pages';
+import { NewDocument } from '../../new-document';
 
 const titleOf = (text: string, fallback: string) => text.match(/^#\s+(.+)$/m)?.[1].trim() || fallback;
+type Sub = { id: string; name: string; title: string; pages: number };
 
-// One .n document, written and checked by N (see Writer); saved with the button or ⌘S, and renamed here.
-export function Editor({ name, initial }: { name: string; initial: string }) {
-  const router = useRouter();
+// One page: the pages above it, its title and name (renamed here), the pages under it and a new one, and
+// its text, written and checked by N (see Writer); saved with the button or ⌘S.
+export function Editor({ id, initial, pages }: { id: string; initial: string; pages: Sub[] }) {
+  const router = useRouter(); const name = nameOf(id);
   const [text, setText] = useState(initial);
   const [renaming, setRenaming] = useState(false); const [to, setTo] = useState(name); const [problem, setProblem] = useState('');
   const title = titleOf(text, name);
   useEffect(() => { document.title = `${title} · N`; }, [title]);
-  const commit = useCallback(async (v: string) => { const r = await fetch(`/api/doc/${encodeURIComponent(name)}`, { method: 'PUT', body: v }); if (!r.ok) throw Error(await r.text()); }, [name]);
-  // The draft being typed reaches the Mac mini before the file moves, so it moves with it.
+  const commit = useCallback(async (v: string) => { const r = await fetch(`/api/doc/${segments(id)}`, { method: 'PUT', body: v }); if (!r.ok) throw Error(await r.text()); }, [id]);
+  // The draft being typed reaches the Mac mini before the page moves, so it moves with it.
   const rename = async () => {
     if (to.trim() === name) { setRenaming(false); return; }
     await new Promise(r => setTimeout(r, 500));
-    const r = await fetch('/api/rename', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ from: name, to: to.trim() }) });
+    const r = await fetch('/api/rename', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ from: id, to: to.trim() }) });
     if (!r.ok) { setProblem(await r.text()); return; }
     router.replace((await r.json() as { path: string }).path);
   };
   return <main className="mx-auto flex max-w-3xl flex-col gap-4 p-4 sm:p-7">
-    <Link href="/" className="text-sm text-stone-500 hover:text-orange-700 dark:text-zinc-400">← N</Link>
+    <nav aria-label="Pages above" className="flex flex-wrap items-center gap-1 text-sm text-stone-500 dark:text-zinc-400">
+      <Link href="/" className="hover:text-orange-700">N</Link>
+      {ancestors(id).map(([aid, aname]) => <span key={aid} className="flex items-center gap-1"><span aria-hidden>/</span><Link href={href(aid)} className="hover:text-orange-700">{aname}</Link></span>)}
+    </nav>
     <div className="flex flex-col gap-1">
       <h1 className="text-3xl font-semibold">{title}</h1>
       {renaming ? <div className="flex flex-wrap items-center gap-2">
@@ -37,6 +45,10 @@ export function Editor({ name, initial }: { name: string; initial: string }) {
         {problem && <p role="alert" className="w-full text-sm text-red-700 dark:text-red-400">{problem}</p>}
       </div> : <button onClick={() => setRenaming(true)} className="self-start text-sm text-stone-500 hover:text-orange-700 dark:text-zinc-400">{name}.n · Rename</button>}
     </div>
-    <Writer name={name} initial={initial} commit={commit} onText={setText} />
+    <section aria-label="Pages under this one" className="flex flex-col gap-2">
+      <PageList pages={pages} />
+      <NewDocument parent={id} />
+    </section>
+    <Writer id={id} initial={initial} commit={commit} onText={setText} />
   </main>;
 }

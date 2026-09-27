@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { Result } from '@/lib/checks';
+import { segments } from '@/lib/pages';
 import { useDictation } from './dictation';
 import { place, Squiggles, type Placed } from './findings';
 
@@ -9,9 +10,9 @@ import { place, Squiggles, type Placed } from './findings';
 // the type check, lint and format, every fix N is sure of applied, and what is left marked in View mode as
 // errors and warnings, each with its suggestions and a box for what the author means. The page can be left
 // while N works; its result is there when the page comes back. An unsaved draft is kept on the Mac mini.
-type Props = { name: string; initial: string; commit: (text: string) => Promise<void>; onText?: (text: string) => void };
+type Props = { id: string; initial: string; commit: (text: string) => Promise<void>; onText?: (text: string) => void };
 
-export function Writer({ name, initial, commit, onText }: Props) {
+export function Writer({ id, initial, commit, onText }: Props) {
   const [text, setText] = useState(initial); const [base, setBase] = useState(initial);
   const [status, setStatus] = useState(''); const [busy, setBusy] = useState(false);
   const [check, setCheck] = useState<Result | null>(null); const [intents, setIntents] = useState<Record<string, string>>({});
@@ -21,7 +22,7 @@ export function Writer({ name, initial, commit, onText }: Props) {
   const latest = useRef(text); latest.current = text;
   useEffect(() => { onText?.(text); }, [text, onText]);
 
-  const store = `/api/draft/${encodeURIComponent(`doc:${name}`)}`;
+  const store = `/api/draft/${encodeURIComponent(`doc:${id}`)}`;
   const loaded = useRef(false);
   useEffect(() => {
     loaded.current = false;
@@ -52,7 +53,7 @@ export function Writer({ name, initial, commit, onText }: Props) {
     let stop = false;
     const look = async () => {
       try {
-        const [r, i] = await Promise.all([fetch(`/api/check/${encodeURIComponent(name)}`, { cache: 'no-store' }), fetch(`/api/intent/${encodeURIComponent(name)}`, { cache: 'no-store' })]);
+        const [r, i] = await Promise.all([fetch(`/api/check/${segments(id)}`, { cache: 'no-store' }), fetch(`/api/intent/${segments(id)}`, { cache: 'no-store' })]);
         const c = await r.json() as Result | null; const is = await i.json() as Array<{ quote: string; intent: string }>;
         if (stop) return;
         setCheck(c); setIntents(Object.fromEntries(is.map(x => [x.quote, x.intent])));
@@ -64,7 +65,7 @@ export function Writer({ name, initial, commit, onText }: Props) {
     const back = () => { if (document.visibilityState === 'visible') void look(); };
     document.addEventListener('visibilitychange', back);
     return () => { stop = true; document.removeEventListener('visibilitychange', back); };
-  }, [name, check?.status === 'running' ? check.started : 0]);
+  }, [id, check?.status === 'running' ? check.started : 0]);
 
   const save = async (v = text) => {
     if (busy || v === base) return true;
@@ -74,7 +75,7 @@ export function Writer({ name, initial, commit, onText }: Props) {
   };
   const compile = async () => {
     if (!(await save())) return;
-    const r = await fetch(`/api/check/${encodeURIComponent(name)}`, { method: 'POST' });
+    const r = await fetch(`/api/check/${segments(id)}`, { method: 'POST' });
     if (!r.ok) { setStatus(await r.text()); return; }
     setCheck(await r.json() as Result); setStatus('');
   };
@@ -105,7 +106,7 @@ export function Writer({ name, initial, commit, onText }: Props) {
       <label htmlFor="writer" className="sr-only">Text</label>
       <textarea id="writer" ref={area} value={text} spellCheck onChange={e => { setText(e.target.value); setStatus(''); }}
         className="h-[70vh] w-full resize-y rounded-lg border border-stone-200 bg-transparent p-4 font-mono text-[15px] leading-relaxed outline-none focus:border-orange-700 dark:border-zinc-800" />
-    </> : <Squiggles text={text} shown={shown} name={name} apply={apply} intents={intents} />}
+    </> : <Squiggles text={text} shown={shown} id={id} apply={apply} intents={intents} />}
     <div className="flex flex-wrap items-center gap-2">
       <Button onClick={compile} disabled={busy || check?.status === 'running'} className="rounded-md bg-stone-900 px-4 py-2 text-white hover:bg-orange-700 dark:bg-zinc-100 dark:text-zinc-900">Check</Button>
       <Button onClick={() => save()} disabled={busy} className="rounded-md border border-stone-300 px-4 py-2 hover:border-orange-700 dark:border-zinc-700">Save</Button>

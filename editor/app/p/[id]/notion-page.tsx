@@ -37,35 +37,37 @@ export function NotionPage({ id, title, raw }: { id: string; title: string; raw:
   // The page, or its unsaved draft, which is kept on the Mac mini until it is saved.
   useEffect(() => {
     (async () => {
-      let kept: string | null = null;
-      try { const r = await fetch(store, { cache: 'no-store' }); if (r.ok) kept = (await r.json() as { text: string | null }).text; } catch {}
-      render(kept ?? raw); sync(); loaded.current = true;
+      // A draft counts only while Notion still has the page it was written from.
+      let kept: { base?: string; md?: string } | null = null;
+      try { const r = await fetch(store, { cache: 'no-store' }); if (r.ok) { const t = (await r.json() as { text: string | null }).text; kept = t ? JSON.parse(t) : null; } } catch { kept = null; }
+      const current = kept?.base === raw && typeof kept.md === 'string' ? kept.md : raw;
+      render(current); sync(); loaded.current = true;
     })();
   }, [raw, store, render, sync]);
   const idle = md === base.current;
   useEffect(() => {
     if (!loaded.current) return;
-    const timer = setTimeout(() => { void fetch(store, idle ? { method: 'DELETE' } : { method: 'PUT', body: md }).catch(() => {}); }, 400);
+    const timer = setTimeout(() => { void fetch(store, idle ? { method: 'DELETE' } : { method: 'PUT', body: JSON.stringify({ base: base.current, md }) }).catch(() => {}); }, 400);
     return () => clearTimeout(timer);
   }, [md, idle, store]);
   useEffect(() => {
-    const leave = () => { if (loaded.current && !idle) navigator.sendBeacon(store, md); };
+    const leave = () => { if (loaded.current && !idle) navigator.sendBeacon(store, JSON.stringify({ base: base.current, md })); };
     window.addEventListener('pagehide', leave);
     return () => window.removeEventListener('pagehide', leave);
   }, [md, idle, store]);
 
-  const select = (f: Found) => { const el = root.current; if (!el) return null; return rangeAt(textOf(el).nodes, f.start, f.end); };
+  const select = (f: Found) => { const el = root.current; if (!el) return null; return rangeAt(textOf(el).nodes, f.start, f.end, el); };
   const pick = (f: Found) => { const r = select(f); if (!r) return; root.current?.focus(); const s = getSelection(); s?.removeAllRanges(); s?.addRange(r); };
   // A fix replaces only the characters that differ, so the formatting around and inside the phrase stays.
   const apply = (f: Found, choice: string) => {
     let p = 0, e = 0; const q = f.quote;
     while (p < q.length && p < choice.length && q[p] === choice[p]) p++;
     while (e < q.length - p && e < choice.length - p && q[q.length - 1 - e] === choice[choice.length - 1 - e]) e++;
-    const el = root.current; const r = el && rangeAt(textOf(el).nodes, f.start + p, f.end - e); if (!r) return;
+    const el = root.current; const r = el && rangeAt(textOf(el).nodes, f.start + p, f.end - e, el); if (!r) return false;
     const put = choice.slice(p, choice.length - e);
     el.focus(); const s = getSelection(); s?.removeAllRanges(); s?.addRange(r);
     if (!document.execCommand(put ? 'insertText' : 'delete', false, put)) { r.deleteContents(); if (put) r.insertNode(document.createTextNode(put)); }
-    forget(f); sync();
+    forget(f); sync(); return true;
   };
 
   // Check: N reads the page now; every fix it is sure of is made, from the end back so each phrase is still
@@ -74,8 +76,8 @@ export function NotionPage({ id, title, raw }: { id: string; title: string; raw:
     const el = root.current; if (!el) return;
     const v = textOf(el).text; const fs = fixable(await check(v));
     if (textOf(el).text !== v) { setStatus('The page changed while N read it: check again'); return; }
-    for (const f of fs) apply(f, f.new);
-    setStatus(fs.length ? `Fixed ${fs.length}` : '');
+    let made = 0; for (const f of fs) if (apply(f, f.new)) made++;
+    setStatus(made ? `Fixed ${made}` : '');
   };
 
   const save = async () => {

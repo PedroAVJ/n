@@ -65,7 +65,12 @@ export function inlineHtml(body: string): string {
 export function blockHtml(b: Block, i: number): string {
   if (b.kind === 'fixed') {
     const page = /<page url="([^"]*)">([\s\S]*?)<\/page>/.exec(b.raw);
-    const shown = page ? `<a class="n-page" href="${escapeHtml(page[1])}">📄 ${escapeHtml(page[2])}</a>` : /^\s*(---|\*\*\*|___)\s*$/.test(b.raw) ? '<hr>' : `<pre>${escapeHtml(b.raw)}</pre>`;
+    const callout = /^\s*<callout(?:\s+icon="([^"]*)")?[^>]*>([\s\S]*?)<\/callout>\s*$/.exec(b.raw);
+    // Anything else is shown as its text, its tags left out.
+    const text = (raw: string) => escapeHtml(raw.replace(/<[^>]+>/g, '').replace(/^\s+|\s+$/g, '').replace(/\n\s*/g, '\n'));
+    const shown = page ? `<a class="n-page" href="${escapeHtml(page[1])}">📄 ${escapeHtml(page[2])}</a>`
+      : callout ? `<div class="n-callout"><span>${escapeHtml(callout[1] ?? '💡')}</span><span>${text(callout[2])}</span></div>`
+      : /^\s*(---|\*\*\*|___)\s*$/.test(b.raw) ? '<hr>' : /^\s*```/.test(b.raw) ? `<pre>${escapeHtml(b.raw.replace(/^\s*```\w*\n?|\n?```\s*$/g, ''))}</pre>` : `<pre>${text(b.raw)}</pre>`;
     return `<div data-b="${i}" data-kind="fixed" contenteditable="false" style="margin-left:${b.indent * 1.5}rem">${shown}</div>`;
   }
   return `<div data-b="${i}" data-kind="${b.kind}" style="margin-left:${b.indent * 1.5}rem">${inlineHtml(b.body) || '<br>'}</div>`;
@@ -99,36 +104,54 @@ export function inlineMd(node: Node): string {
 
 // Each block of the edited page: one Notion gave, kept exactly when unchanged; one it split (Enter) keeps
 // its kind; a new one is a paragraph. `canon` is what each given block serializes to before any edit.
+// Blocks that cannot be edited here (child pages, callouts, tables…) are never dropped: one missing from
+// the page goes back after the block that came before it.
 export function pageMd(root: HTMLElement, blocks: Block[], canon: string[]): string {
-  const used = new Set<number>(); const lines: string[] = [];
+  const used = new Set<number>(); const out: Array<{ i: number; line: string }> = []; let last = -1;
   root.childNodes.forEach(n => {
-    if (!(n instanceof HTMLElement)) { const t = (n.textContent ?? '').trim(); if (t) lines.push(escapeMd(t)); return; }
+    if (!(n instanceof HTMLElement)) { const t = (n.textContent ?? '').trim(); if (t) out.push({ i: last, line: escapeMd(t) }); return; }
     const i = Number(n.getAttribute('data-b')); const b = Number.isInteger(i) && n.hasAttribute('data-b') ? blocks[i] : undefined;
-    if (b?.kind === 'fixed') { lines.push(b.raw); used.add(i); return; }
+    if (b && !used.has(i)) last = i;
+    if (b?.kind === 'fixed') { if (!used.has(i)) out.push({ i, line: b.raw }); used.add(i); return; }
     const body = inlineMd(n);
-    if (b && !used.has(i) && body === canon[i]) { lines.push(b.raw); used.add(i); return; }
+    if (b && !used.has(i) && body === canon[i]) { out.push({ i, line: b.raw }); used.add(i); return; }
     if (b && !used.has(i)) used.add(i);
     const prefix = b ? b.prefix.replace(/\[[xX]\]/, n.getAttribute('data-kind') === 'done' ? '[x]' : '[ ]') : '';
-    lines.push(prefix + (body.trim() ? body : prefix ? body : '<empty-block/>'));
+    out.push({ i: last, line: prefix + (body.trim() ? body : prefix ? body : '<empty-block/>') });
   });
-  return lines.join('\n');
+  blocks.forEach((b, i) => {
+    if (b.kind !== 'fixed' || used.has(i)) return;
+    out.splice(out.findLastIndex(o => o.i < i) + 1, 0, { i, line: b.raw });
+  });
+  return out.map(o => o.line).join('\n');
 }
 
-// What N reads: each block's text, blocks apart by a blank line, and where each text node sits in it.
+// What N reads: the text of each block this editor writes, blocks apart by a blank line, and where each
+// text node sits in it. Child pages, callouts and other blocks it cannot edit, and mentions, are not read.
+const fixedPart = (n: Node, root: HTMLElement) => { for (let e = n.parentElement; e && e !== root; e = e.parentElement) if (e.getAttribute('contenteditable') === 'false') return true; return false; };
 export function textOf(root: HTMLElement): { text: string; nodes: Array<{ node: Text; at: number }> } {
   let text = ''; const nodes: Array<{ node: Text; at: number }> = [];
   root.childNodes.forEach(block => {
+    if (block instanceof HTMLElement && block.getAttribute('contenteditable') === 'false') return;
     if (text) text += '\n\n';
     const walk = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
     let t: Node | null;
-    while ((t = walk.nextNode())) { nodes.push({ node: t as Text, at: text.length }); text += (t as Text).data; }
+    while ((t = walk.nextNode())) { if (fixedPart(t, root)) continue; nodes.push({ node: t as Text, at: text.length }); text += (t as Text).data; }
   });
   return { text, nodes };
 }
 
-export function rangeAt(nodes: Array<{ node: Text; at: number }>, start: number, end: number): Range | null {
+// A range that stays inside one block and holds nothing this editor cannot edit, or none.
+export function rangeAt(nodes: Array<{ node: Text; at: number }>, start: number, end: number, root?: HTMLElement): Range | null {
   const s = nodes.find(n => start >= n.at && start <= n.at + n.node.data.length);
   const e = [...nodes].reverse().find(n => end >= n.at && end <= n.at + n.node.data.length);
   if (!s || !e) return null;
-  const r = document.createRange(); r.setStart(s.node, start - s.at); r.setEnd(e.node, end - e.at); return r;
+  const r = document.createRange(); r.setStart(s.node, start - s.at); r.setEnd(e.node, end - e.at);
+  if (root) {
+    const blockOf = (n: Node) => { let x: Node | null = n; while (x && x.parentNode !== root) x = x.parentNode; return x; };
+    if (blockOf(s.node) !== blockOf(e.node)) return null;
+    const box = document.createElement('div'); box.appendChild(r.cloneContents());
+    if (box.querySelector('[contenteditable="false"]')) return null;
+  }
+  return r;
 }

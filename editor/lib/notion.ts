@@ -26,25 +26,6 @@ export async function recent(count = 30): Promise<Page[]> {
   return (r.results ?? []).filter((p: any) => !p.in_trash && p.parent?.type !== 'data_source_id' && p.parent?.type !== 'database_id').map(page);
 }
 
-// Notion's Markdown marks a commented phrase with a <span discussion-urls="…"> around it. The writer sees
-// the phrase alone; saving puts each mark back around its phrase, wherever the phrase now is.
-type Anchor = { open: string; inner: string; at: number };
-const anchorTag = /<span discussion-urls="[^"]*">([\s\S]*?)<\/span>/g;
-export function clean(raw: string): { text: string; anchors: Anchor[] } {
-  const anchors: Anchor[] = []; let text = '', last = 0;
-  for (const m of raw.matchAll(anchorTag)) {
-    text += raw.slice(last, m.index); anchors.push({ open: m[0].slice(0, m[0].indexOf('>') + 1), inner: m[1], at: text.length }); text += m[1]; last = m.index + m[0].length;
-  }
-  return { text: text + raw.slice(last), anchors };
-}
-function restore(text: string, anchors: Anchor[]): string {
-  const at = anchors.flatMap(a => { const near = text.indexOf(a.inner, Math.max(0, a.at - 400)); const i = near >= 0 ? near : text.indexOf(a.inner); return i < 0 || !a.inner ? [] : [{ ...a, i }]; })
-    .sort((x, y) => y.i - x.i);
-  let out = text;
-  for (const a of at) out = out.slice(0, a.i) + a.open + a.inner + '</span>' + out.slice(a.i + a.inner.length);
-  return out;
-}
-
 // The page's own text, block by block, as Notion holds it: its suggested edits pending are not in it, while
 // its Markdown shows them merged in.
 async function texts(id: string): Promise<string[]> {
@@ -53,18 +34,17 @@ async function texts(id: string): Promise<string[]> {
 }
 const plain = (s: string) => s.replace(/<[^>]+>/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_`~]/g, '').replace(/\s+/g, ' ').trim();
 
-export async function read(id: string): Promise<{ page: Page; raw: string; text: string; pending: boolean }> {
+export async function read(id: string): Promise<{ page: Page; raw: string; pending: boolean }> {
   const [p, m, ts] = await Promise.all([api(`v1/pages/${id}`), api(`v1/pages/${id}/markdown`), texts(id)]);
   const raw: string = m.markdown ?? '';
   const flat = plain(raw);
-  return { page: page(p), raw, text: clean(raw).text, pending: ts.some(t => t.trim() && !flat.includes(plain(t))) };
+  return { page: page(p), raw, pending: ts.some(t => t.trim() && !flat.includes(plain(t))) };
 }
 
 // Saving sends only what changed, as one search-and-replace grown to whole lines until it is unique, so the
 // rest of the page (its blocks, their comments) stays as it is.
-export async function save(id: string, before: string, text: string): Promise<{ raw: string; text: string }> {
-  const after = restore(text, clean(before).anchors);
-  if (before === after) return { raw: before, text };
+export async function save(id: string, before: string, after: string): Promise<string> {
+  if (before === after) return before;
   let start = 0, end = 0;
   while (start < before.length && start < after.length && before[start] === after[start]) start++;
   while (end < before.length - start && end < after.length - start && before[before.length - 1 - end] === after[after.length - 1 - end]) end++;
@@ -78,6 +58,5 @@ export async function save(id: string, before: string, text: string): Promise<{ 
   const r = old
     ? await api(`v1/pages/${id}/markdown`, 'PATCH', { type: 'update_content', update_content: { content_updates: [{ old_str: old, new_str: next }] } })
     : await api(`v1/pages/${id}/markdown`, 'PATCH', { type: 'replace_content', replace_content: { new_str: after } });
-  const raw: string = r.markdown ?? after;
-  return { raw, text: clean(raw).text };
+  return r.markdown ?? after;
 }

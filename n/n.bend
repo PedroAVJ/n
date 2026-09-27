@@ -23,7 +23,7 @@ def model() -> String:
   "typesafe/jev-1.13"
 
 def version() -> Pl.Version:
-  Pl.Version{0n, 8n, 0n}
+  Pl.Version{0n, 9n, 0n}
 
 # ---- the hook ----
 # Jev screens every phrase; Claude runs N4's checker on what Jev flagged and gives each finding its one
@@ -154,16 +154,17 @@ def screen(+item: String) -> IO(Unit):
     +k : String <- E.key(item)
     jev_screen(String.is_empty(k), k, C.text(C.at(v, "conversation")), C.text(C.at(v, "text")))
 
-# N's checker prompt for {text, check} on stdin, for a caller that asks Claude itself: check is "type",
-# "lint" or "format".
+# N's checker prompt for {text, check, intents, isolate} on stdin, for a caller that asks Claude itself:
+# check is "type", "lint" or "format"; intents, what the author said they meant; isolate, spans left wrong.
 def prompt() -> IO(Unit):
   do IO<Unit>:
     input : String <- E.stdin()
     +v : Maybe<&2, Json.Val> = Json.parse(input)
     +which : String = C.text(C.at(v, "check"))
     +text : String = C.text(C.at(v, "text"))
-    IO.print(Bool.pick(String, String.eq(which, "lint"), C.lint_prompt(text),
-      Bool.pick(String, String.eq(which, "format"), C.format_prompt(text), C.type_prompt(text))))
+    IO.print(C.with_notes(Bool.pick(String, String.eq(which, "lint"), C.lint_prompt(text),
+      Bool.pick(String, String.eq(which, "format"), C.format_prompt(text), C.type_prompt(text))),
+      C.strings(C.at(v, "intents")), C.strings(C.at(v, "isolate"))))
 
 def read() -> IO(Unit):
   do IO<Unit>:

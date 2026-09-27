@@ -76,11 +76,12 @@ function within<T>(ms: number, p: Promise<T>): Promise<T> {
   return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => { checker?.close(); checker = null; reject(Error('N check took over two minutes')); }, ms))]);
 }
 
-// One of N's three checks, as N.n orders them: the type check, lint, then format.
+// One of N's three checks: the type check, lint or format, given what the author said they meant about
+// earlier findings (intents) and the spans an earlier check left wrong (isolate).
 export type Which = 'type' | 'lint' | 'format';
-export async function check(text: string, which: Which): Promise<Review> {
+export async function check(text: string, which: Which, intents: string[] = [], isolate: string[] = []): Promise<Review> {
   const started = Date.now();
-  const prompt = await runN(['prompt'], { text, check: which });
+  const prompt = await runN(['prompt'], { text, check: which, intents, isolate });
   const answer = await within(120000, claude(prompt));
   const r = JSON.parse(await runN(['read'], { text, answer })) as { marks: Mark[] };
   return { marks: inUnits(text, r.marks), assessor: 'Claude Opus 5.5', seconds: (Date.now() - started) / 1000 };

@@ -187,6 +187,20 @@ def format_prompt(+text: String) -> String:
   "The text has passed the type check and lint. Run FORMAT only: nothing but the truth. Is there only what matters? Report each span that repeats what the text already says, or says what does not matter. Level \"format\". Every format finding is fixable, because the text is already correct and precise: delete the span, or merge it into one statement, keeping the meaning and the structure, like a code formatter.\n\n" ++
   answer_shape("\"format\"") ++ text
 
+# What the author said they meant about earlier findings, and the spans an earlier check found wrong and
+# left unresolved: a check takes the intent into account, and works around those spans instead of on them.
+def bullets(xs: List<&2, String>) -> String:
+  match xs:
+    case []:
+      ""
+    case x <> rest:
+      "\n- " ++ x ++ bullets(rest)
+
+def with_notes(+prompt: String, +intents: List<&2, String>, +isolate: List<&2, String>) -> String:
+  prompt ++
+  Bool.pick(String, List.is_empty(&2, String, intents), "", "\n\nTHE AUTHOR'S INTENT (not part of the text; what the author said they meant about earlier findings): where the text does not yet say what the author means, report that span as FIXABLE with the rewrite that says it, in the author's words and the text's language; never ask about it again." ++ bullets(intents)) ++
+  Bool.pick(String, List.is_empty(&2, String, isolate), "", "\n\nISOLATED (not part of the text; spans an earlier check found wrong and left unresolved: do not report them, and check the rest as if they were fixed):" ++ bullets(isolate))
+
 # Claude's answer holds the annotations inside its result text, sometimes fenced.
 def from_brace(cs: List<&2, Char>) -> List<&2, Char>:
   match cs:

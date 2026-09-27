@@ -1,24 +1,25 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { names, useN, type Found, type Which } from './use-n';
-import { fixable } from './fixes';
-import { Checks, Findings } from './findings';
+import type { Result } from '@/lib/checks';
+import { useDictation } from './dictation';
+import { Findings, place, type Placed } from './findings';
 
-// Writing, checked by N when asked: Check makes every fix N is sure of and lists what it cannot fix, whose
-// readings replace the phrase when chosen. `commit` saves the text.
-type Props = { draft: string; initial: string; commit: (text: string) => Promise<string | void>; label: string; rows?: string; onText?: (text: string) => void };
+// A .n document, written and checked by N. Check saves the text and has N compile it in the background:
+// the type check, lint and format, every fix N is sure of applied, and what is left listed as errors and
+// warnings, each with its suggestions and a box for what the author means. The page can be left while N
+// works; its result is there when the page comes back. An unsaved draft is kept on the Mac mini.
+type Props = { name: string; initial: string; commit: (text: string) => Promise<void>; onText?: (text: string) => void };
 
-export function Writer({ draft, initial, commit, label, rows = 'h-[60vh]', onText }: Props) {
+export function Writer({ name, initial, commit, onText }: Props) {
   const [text, setText] = useState(initial); const [base, setBase] = useState(initial);
   const [status, setStatus] = useState(''); const [busy, setBusy] = useState(false);
-  const [listening, setListening] = useState(false); const recorder = useRef<MediaRecorder | null>(null);
+  const [check, setCheck] = useState<Result | null>(null); const [intents, setIntents] = useState<Record<string, string>>({});
   const area = useRef<HTMLTextAreaElement>(null);
   const latest = useRef(text); latest.current = text;
   useEffect(() => { onText?.(text); }, [text, onText]);
-  // An unsent or unsaved draft is kept on the Mac mini until it is sent or saved, so it outlives a reload
-  // and is the same in Safari and the Home Screen app. Text typed before the page came alive is kept too.
-  const store = `/api/draft/${encodeURIComponent(draft)}`;
+
+  const store = `/api/draft/${encodeURIComponent(`doc:${name}`)}`;
   const loaded = useRef(false);
   useEffect(() => {
     loaded.current = false;
@@ -29,8 +30,7 @@ export function Writer({ draft, initial, commit, label, rows = 'h-[60vh]', onTex
       if (typed && typed !== initial) setText(typed); else if (kept !== null && kept !== initial) setText(kept);
       loaded.current = true;
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store]);
+  }, [store, initial]);
   const idle = text === base;
   useEffect(() => {
     if (!loaded.current) return;
@@ -43,73 +43,71 @@ export function Writer({ draft, initial, commit, label, rows = 'h-[60vh]', onTex
     return () => window.removeEventListener('pagehide', leave);
   }, [text, idle, store]);
 
-  const { shown, running, error, done, unlocked, pass, keep, run, forget, current } = useN(text);
-  // One of N's checks: it makes every fix it is sure of, from the end back so each phrase is still where N
-  // found it; with nothing left to choose, the check passes and the next one unlocks.
-  const check = async (w: Which) => {
-    const v = text; const fs = await run(w, v); if (!fs) return;
-    if (latest.current !== v) { setStatus('The text changed while N read it: run it again'); return; }
-    const fix = fixable(fs); let next = v;
-    for (const f of fix) next = next.slice(0, f.start) + f.new + next.slice(f.end);
-    if (fix.length) { setText(next); fix.forEach(forget); }
-    const left = fs.length - fix.length;
-    if (!left) pass(w, next);
-    setStatus(`${names[w]}: ${fix.length ? `fixed ${fix.length}` : 'nothing to fix'}${left ? `, ${left} to choose` : ', passed'}`);
-  };
-  const edit = (v: string) => { setText(v); setStatus(''); };
-  // A reading or the writer's own rewrite replaces the phrase; the last one chosen passes the check.
-  const apply = (f: Found, choice: string) => {
-    const next = text.slice(0, f.start) + choice + text.slice(f.end); setText(next); forget(f);
-    if (current && shown.length === 1) { pass(current, next); setStatus(`${names[current]}: passed`); } else keep(text, next);
-    area.current?.focus();
-  };
-  const pick = (f: Found) => { const a = area.current; if (!a) return; a.focus(); a.setSelectionRange(f.start, f.end); };
-  const save = async () => {
-    const v = text; if (busy || v === base) return;
+  // The last check, and while one runs, its progress. Once it is done, its fixed text replaces the text if
+  // the text is still what N read.
+  const applied = useRef(0);
+  useEffect(() => {
+    let stop = false;
+    const look = async () => {
+      try {
+        const [r, i] = await Promise.all([fetch(`/api/check/${name}`, { cache: 'no-store' }), fetch(`/api/intent/${name}`, { cache: 'no-store' })]);
+        const c = await r.json() as Result | null; const is = await i.json() as Array<{ quote: string; intent: string }>;
+        if (stop) return;
+        setCheck(c); setIntents(Object.fromEntries(is.map(x => [x.quote, x.intent])));
+        if (c?.status === 'done' && applied.current !== c.started && latest.current === c.base) { applied.current = c.started; setText(c.text); setBase(c.text); }
+        if (c?.status === 'running') setTimeout(look, 3000);
+      } catch { if (!stop) setTimeout(look, 5000); }
+    };
+    void look();
+    const back = () => { if (document.visibilityState === 'visible') void look(); };
+    document.addEventListener('visibilitychange', back);
+    return () => { stop = true; document.removeEventListener('visibilitychange', back); };
+  }, [name, check?.status === 'running' ? check.started : 0]);
+
+  const save = async (v = text) => {
+    if (busy || v === base) return true;
     setBusy(true); setStatus('Saving…');
-    try { const out = await commit(v); const now = typeof out === 'string' ? out : v; setBase(now); setText(t => t === v ? now : t); setStatus('Saved'); }
-    catch (e) { setStatus((e as Error).message); } finally { setBusy(false); }
+    try { await commit(v); setBase(v); setStatus('Saved'); return true; }
+    catch (e) { setStatus((e as Error).message); return false; } finally { setBusy(false); }
+  };
+  const compile = async () => {
+    if (!(await save())) return;
+    const r = await fetch(`/api/check/${name}`, { method: 'POST' });
+    if (!r.ok) { setStatus(await r.text()); return; }
+    setCheck(await r.json() as Result); setStatus('');
   };
   useEffect(() => { const key = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); void save(); } }; window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key); });
 
-  // Dictation: record until pressed again, then ElevenLabs Scribe's text replaces the selection (or goes in at the cursor).
-  const dictate = async () => {
-    if (recorder.current) { recorder.current.stop(); return; }
-    let stream: MediaStream;
-    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { setStatus('No microphone access'); return; }
-    const chunks: Blob[] = []; const rec = new MediaRecorder(stream); recorder.current = rec;
-    const at = { start: area.current?.selectionStart ?? text.length, end: area.current?.selectionEnd ?? text.length };
-    rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
-    rec.onstop = async () => {
-      stream.getTracks().forEach(t => t.stop()); recorder.current = null; setListening(false); setStatus('Transcribing…');
-      try {
-        const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
-        const r = await fetch('/api/dictate', { method: 'POST', headers: { 'content-type': blob.type }, body: blob });
-        const out = await r.json() as { text?: string; error?: string };
-        if (!r.ok || out.text === undefined) throw Error(out.error || 'Dictation failed');
-        const said = out.text;
-        setText(current => { const before = current.slice(0, at.start), after = current.slice(at.end); const space = before && !/\s$/.test(before) && said ? ' ' : ''; return before + space + said + after; });
-        setStatus('Dictated');
-      } catch (e) { setStatus((e as Error).message); }
-    };
-    rec.start(); setListening(true); setStatus('Listening… press Dictate again to stop');
-  };
+  const { listening, toggle } = useDictation(said => {
+    const at = { start: area.current?.selectionStart ?? latest.current.length, end: area.current?.selectionEnd ?? latest.current.length };
+    setText(current => { const before = current.slice(0, at.start), after = current.slice(at.end); const space = before && !/\s$/.test(before) && said ? ' ' : ''; return before + space + said + after; });
+  }, setStatus);
 
-  const box = 'w-full rounded-lg border p-4 font-mono text-[15px] leading-relaxed whitespace-pre-wrap break-words';
+  const found: Placed[] = check && check.status !== 'running' ? [...check.errors.map(f => ({ ...f, error: true })), ...check.warnings.map(f => ({ ...f, error: false }))] : [];
+  const shown = place(text, found);
+  const apply = (f: Placed, choice: string) => { setText(text.slice(0, f.start) + choice + text.slice(f.end)); area.current?.focus(); };
+  const pick = (f: Placed) => { const a = area.current; if (!a) return; a.focus(); a.setSelectionRange(f.start, f.end); };
+  const errors = shown.filter(f => f.error).length, warnings = shown.length - errors;
+  const verdict = !check ? null
+    : check.status === 'running' ? { tone: 'bg-stone-200 text-stone-700 dark:bg-zinc-800 dark:text-zinc-300', label: 'N is checking in the background: you can leave this page', spin: true }
+    : check.status === 'failed' ? { tone: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300', label: `N failed: ${check.error}`, spin: false }
+    : !shown.length ? { tone: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300', label: `✓ Compiles${check.fixed ? ` · fixed ${check.fixed}` : ''}`, spin: false }
+    : { tone: errors ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300' : 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300', label: `${errors} error${errors === 1 ? '' : 's'}, ${warnings} warning${warnings === 1 ? '' : 's'}${check.fixed ? ` · fixed ${check.fixed}` : ''}`, spin: false };
+  const stale = check?.status === 'done' && text !== check.text && text === base ? 'Edited since this check' : '';
+
   return <div className="flex flex-col gap-3">
-    <div>
-      <label htmlFor="writer" className="sr-only">Text</label>
-      <textarea id="writer" ref={area} value={text} spellCheck onChange={e => edit(e.target.value)}
-        className={`${box} ${rows} relative block resize-y border-stone-200 bg-transparent outline-none focus:border-orange-700 dark:border-zinc-800`} />
-    </div>
-    <Checks done={done} unlocked={unlocked} running={running} run={check} />
-    {error && <p role="alert" className="text-sm text-red-700 dark:text-red-400">{error}</p>}
+    <label htmlFor="writer" className="sr-only">Text</label>
+    <textarea id="writer" ref={area} value={text} spellCheck onChange={e => { setText(e.target.value); setStatus(''); }}
+      className="h-[70vh] w-full resize-y rounded-lg border border-stone-200 bg-transparent p-4 font-mono text-[15px] leading-relaxed outline-none focus:border-orange-700 dark:border-zinc-800" />
     <div className="flex flex-wrap items-center gap-2">
-      <Button onClick={save} disabled={busy} className="rounded-md bg-stone-900 px-4 py-2 text-white hover:bg-orange-700 dark:bg-zinc-100 dark:text-zinc-900">{label}</Button>
-      <Button onClick={dictate} aria-pressed={listening} className={`rounded-md border px-4 py-2 ${listening ? 'border-orange-700 bg-orange-700 text-white' : 'border-stone-300 hover:border-orange-700 dark:border-zinc-700'}`}>{listening ? 'Stop' : 'Dictate'}</Button>
+      <Button onClick={compile} disabled={busy || check?.status === 'running'} className="rounded-md bg-stone-900 px-4 py-2 text-white hover:bg-orange-700 dark:bg-zinc-100 dark:text-zinc-900">Check</Button>
+      <Button onClick={() => save()} disabled={busy} className="rounded-md border border-stone-300 px-4 py-2 hover:border-orange-700 dark:border-zinc-700">Save</Button>
+      <Button onClick={toggle} aria-pressed={listening} className={`rounded-md border px-4 py-2 ${listening ? 'border-orange-700 bg-orange-700 text-white' : 'border-stone-300 hover:border-orange-700 dark:border-zinc-700'}`}>{listening ? 'Stop' : 'Dictate'}</Button>
       <Button onClick={() => navigator.clipboard.writeText(text)} className="rounded-md border border-stone-300 px-4 py-2 hover:border-orange-700 dark:border-zinc-700">Copy</Button>
-      <span className="text-sm text-stone-500 dark:text-zinc-400">{[text !== base ? 'Unsaved' : '', status].filter(Boolean).join(' · ')}</span>
+      {verdict && <span role="status" aria-live="polite" className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${verdict.tone}`}>
+        {verdict.spin && <span aria-hidden className="size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />}{verdict.label}</span>}
+      <span className="text-sm text-stone-500 dark:text-zinc-400">{[text !== base ? 'Unsaved' : '', stale, status].filter(Boolean).join(' · ')}</span>
     </div>
-    <Findings shown={shown} pick={pick} apply={apply} />
+    <Findings shown={shown} name={name} pick={pick} apply={apply} intents={intents} />
   </div>;
 }

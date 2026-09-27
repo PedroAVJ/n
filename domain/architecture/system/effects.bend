@@ -293,6 +293,27 @@ def observe(+root: String, +entry: String, r: Rl.Release) -> IO(P.Observed):
         return P.Observed{fs, reached, hs, rm, ts}
 
 # ---- a deploy: carry out a plan with nothing blocked ----
+# Loading a launch agent: `launchctl bootout` returns before the old job is gone, and loading it again fails
+# until it is, so this tries every quarter second, up to `fuel` times.
+def bootstrap_after(ok: Bool, fuel: Nat, +domain: String, +path: String) -> IO(Bool):
+  match ok:
+    case True{}:
+      IO.pure(Bool, True{})
+    case False{}:
+      match fuel:
+        case 0n:
+          IO.pure(Bool, False{})
+        case 1n+k:
+          do IO<Bool>:
+            IO.sleep(250)
+            again : Bool <- X.succeeds("/bin/launchctl", ["bootstrap", domain, path])
+            bootstrap_after(again, k, domain, path)
+
+def bootstrap(fuel: Nat, +domain: String, +path: String) -> IO(Bool):
+  do IO<Bool>:
+    first : Bool <- X.succeeds("/bin/launchctl", ["bootstrap", domain, path])
+    bootstrap_after(first, fuel, domain, path)
+
 def apply(+root: String, +bend: String, s: P.Step) -> IO(Unit):
   match s:
     case P.Current{_}:
@@ -319,7 +340,7 @@ def apply(+root: String, +bend: String, s: P.Step) -> IO(Unit):
         _ : Bool <- X.succeeds("/bin/mkdir", ["-p", Fs.path.parent(path)])
         X.write(path, plist)
         _ : Bool <- X.succeeds("/bin/launchctl", ["bootout", domain ++ "/" ++ l])
-        ok : Bool <- X.succeeds("/bin/launchctl", ["bootstrap", domain, path])
+        ok : Bool <- bootstrap(20n, domain, path)
         IO.print(Bool.pick(String, ok, "launched " ++ l, "failed   launch " ++ l))
     case P.Rebuild{+h, +fl, +mac}:
       do IO<Unit>:

@@ -73,7 +73,7 @@ def system() -> S.System:
       mac_mini(),
       D.Node{"iphone", "iPhone", "iOS", D.Device{}, H.Owned{"iphone"}, D.Unmanaged{}, [], ["browser"]}]},
     Rl.Release{Rl.Repository{"PedroAVJ/n", True{}},
-      [Rl.Package{"near-v-framework", "0.5.0.0", "v.bend", ["rose", "compound", "architecture", "view", "plan"]}],
+      [Rl.Package{"near-v-framework", "0.5.1.0", "v.bend", ["rose", "compound", "architecture", "view", "plan"]}],
       [Rl.Plugin{"n", N.version(), "n/n.bend", ["n", "editor-page", "editor-server"], Rl.Repository{"PedroAVJ/near-plugins", True{}}}]}}
 
 def external(+k: String, +n: String, +d: String, c: C.Category, us: List<&2, Rel.Relationship>) -> X.External:

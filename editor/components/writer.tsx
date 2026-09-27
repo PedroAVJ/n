@@ -6,9 +6,9 @@ import type { Mark, Review } from '@/lib/n';
 // Writing with N as it is written, like a code editor with its checker: each phrase with more than one
 // reading is underlined in the text while you type. Jev screens the text as soon as typing pauses; N check
 // reads the whole of it a moment later, and its findings replace Jev's. A finding's fix or reading replaces
-// its phrase when chosen. A chat message is read against its chat (`context`). `commit` saves or sends the text, and a sent text leaves the box empty.
+// its phrase when chosen. `commit` saves or sends the text, and a sent text leaves the box empty.
 type Found = Mark & { quote: string; jev?: boolean };
-type Props = { draft: string; context?: string; initial: string; commit: (text: string) => Promise<string | void>; label: string; clears?: boolean; rows?: string; onText?: (text: string) => void; placeholder?: string };
+type Props = { draft: string; initial: string; commit: (text: string) => Promise<string | void>; label: string; clears?: boolean; rows?: string; onText?: (text: string) => void; placeholder?: string };
 
 // A finding follows its phrase while the text around it changes, and is dropped once the phrase is gone.
 function place(text: string, found: Found[]): Found[] {
@@ -22,7 +22,7 @@ function place(text: string, found: Found[]): Found[] {
 
 const tone = (f: Found) => f.jev ? 'decoration-stone-400' : f.fixable ? 'decoration-sky-600' : f.level === 'error' || f.level === 'high' ? 'decoration-red-600' : 'decoration-orange-600';
 
-export function Writer({ draft, context = '', initial, commit, label, clears, rows = 'h-[60vh]', onText, placeholder }: Props) {
+export function Writer({ draft, initial, commit, label, clears, rows = 'h-[60vh]', onText, placeholder }: Props) {
   const [text, setText] = useState(initial); const [base, setBase] = useState(initial);
   const [found, setFound] = useState<Found[]>([]); const [by, setBy] = useState(''); const [checking, setChecking] = useState(false);
   const [status, setStatus] = useState(''); const [busy, setBusy] = useState(false);
@@ -46,14 +46,13 @@ export function Writer({ draft, context = '', initial, commit, label, clears, ro
 
   const read = (v: string, r: Review, jev = false) => r.marks.map(m => ({ ...m, quote: v.slice(m.start, m.end), jev }));
   const byN = useRef(false);
-  const ask = (v: string): RequestInit => context ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: v, conversation: context }) } : { method: 'POST', body: v };
   // Jev after a short pause, N check after a longer one. Jev's marks join N's earlier findings that still
   // hold; N's answer replaces them all, placed in the text as it is by then.
   useEffect(() => {
     if (!text.trim()) { setFound([]); setBy(''); return; }
     const v = text;
     const jev = setTimeout(async () => {
-      try { const r = await fetch('/api/screen', ask(v)); const out = await r.json() as Review;
+      try { const r = await fetch('/api/screen', { method: 'POST', body: v }); const out = await r.json() as Review;
         if (!r.ok || !out.marks || latest.current !== v) return;
         setFound(fs => { const kept = byN.current ? place(v, fs) : []; const extra = read(v, out, true).filter(j => !kept.some(k => j.start < k.end && k.start < j.end)); return place(v, [...kept, ...extra]); });
         if (!byN.current) setBy('Jev');
@@ -61,7 +60,7 @@ export function Writer({ draft, context = '', initial, commit, label, clears, ro
     }, 700);
     const n = setTimeout(async () => {
       setChecking(true);
-      try { const r = await fetch('/api/check', ask(v)); const out = await r.json() as Review & { error?: string };
+      try { const r = await fetch('/api/check', { method: 'POST', body: v }); const out = await r.json() as Review & { error?: string };
         if (!r.ok) throw Error(out.error || 'N check failed');
         setFound(place(latest.current, read(v, out))); setBy('N'); byN.current = true;
         setAnswered({ text: v, count: out.marks.length, error: '' });

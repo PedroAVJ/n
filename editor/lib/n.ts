@@ -72,9 +72,9 @@ function claude(prompt: string): Promise<string> {
   return answer;
 }
 
-export async function screen(text: string, conversation = ''): Promise<Review> {
+export async function screen(text: string): Promise<Review> {
   const started = Date.now();
-  const r = JSON.parse(await runN(['screen', keychainItem], { text, conversation })) as { marks: Mark[]; assessor: string };
+  const r = JSON.parse(await runN(['screen', keychainItem], { text, conversation: '' })) as { marks: Mark[]; assessor: string };
   return { marks: inUnits(text, r.marks), assessor: r.assessor, seconds: (Date.now() - started) / 1000 };
 }
 
@@ -83,19 +83,10 @@ function within<T>(ms: number, p: Promise<T>): Promise<T> {
   return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => { checker?.close(); checker = null; reject(Error('N check took over two minutes')); }, ms))]);
 }
 
-// A chat message is checked against its chat (`conversation`); anything else as a whole document.
-export async function check(text: string, conversation = ''): Promise<Review> {
+export async function check(text: string): Promise<Review> {
   const started = Date.now();
-  const prompt = await runN(['prompt'], { text, conversation });
+  const prompt = await runN(['prompt'], { text });
   const answer = await within(120000, claude(prompt));
   const r = JSON.parse(await runN(['read'], { text, answer })) as { marks: Mark[] };
   return { marks: inUnits(text, r.marks), assessor: 'Claude Opus 5.5', seconds: (Date.now() - started) / 1000 };
-}
-
-// A check's request: the text itself, or JSON {text, conversation}.
-export async function body(request: Request): Promise<{ text: string; conversation: string }> {
-  const raw = await request.text();
-  if (!request.headers.get('content-type')?.includes('application/json')) return { text: raw, conversation: '' };
-  const v = JSON.parse(raw) as { text?: string; conversation?: string };
-  return { text: v.text ?? '', conversation: v.conversation ?? '' };
 }

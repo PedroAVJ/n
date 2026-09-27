@@ -16,7 +16,6 @@ export function Conversation({ jid, name, group, initial }: { jid: string; name:
     if (!r.ok) throw Error(await r.text());
     setMs(m => [...m, { id: `sent-${Date.now()}`, mine: true, text, media: '', at: new Date().toISOString() }]);
   }, [jid]);
-  const context = ms.slice(-40).map(m => `[${day(m.at)} ${time(m.at)}] ${m.mine ? 'Pedro' : group ? 'Someone' : name}: ${m.text || (m.media ? `(${m.media})` : '')}`).join('\n');
   let last = '';
   return <div className="flex flex-col gap-4">
     <div className="flex max-h-[50vh] flex-col gap-1.5 overflow-y-auto rounded-lg border border-stone-200 p-3 dark:border-zinc-800">
@@ -31,6 +30,6 @@ export function Conversation({ jid, name, group, initial }: { jid: string; name:
         </div>; })}
       <div ref={end} />
     </div>
-    <Writer draft={`whatsapp:${jid}`} context={context} initial="" commit={commit} label="Send" clears rows="h-36" placeholder={`Message ${name}`} />
+    <Writer draft={`whatsapp:${jid}`} initial="" commit={commit} label="Send" clears rows="h-36" placeholder={`Message ${name}`} />
   </div>;
 }

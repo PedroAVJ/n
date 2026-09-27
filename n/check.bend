@@ -169,11 +169,6 @@ def document_prompt(+text: String) -> String:
   "Run the TYPE ERROR and LINT checks together. First identify span-scoped grammar and sense errors, then document-scoped logic errors (non sequitur, contradiction, unresolved names). Give these level \"error\". Then identify lint in the remaining spans: ambiguity, duplication, inconsistent naming, forward references, and dead text. Give lint level low, medium, or high. Do not report a lint finding for a span already marked as a type error. Do not skip the document pass: list to yourself every claim and every definition, then report each one that appears more than once, each concept with two names or name with two concepts, each term used before it is defined, and each span that adds nothing. Formatting is never reported.\n\n" ++
   "Return JSON only, shape: {\"annotations\":[{\"quote\":string,\"level\":\"error\"|\"low\"|\"medium\"|\"high\",\"why\":string,\"fixable\":boolean,\"new\":string,\"question\":string,\"options\":[string]}]}. \"quote\" must be an exact, unique substring of the text (copy characters exactly). Two kinds of finding, like a linter: FIXABLE, where exactly one rewrite preserves the author's meaning: set \"fixable\": true and put that rewrite in \"new\" (empty string means delete); and NOT FIXABLE, where the author's meaning is undetermined: set \"fixable\": false, \"new\": \"\", put the clarifying question in \"question\", and put 2 or 3 candidate rewrites of the span in \"options\", one per plausible reading. Never put the original span in \"new\". A rewrite must keep the author's position exactly. When two sentences contradict, the fix is usually to mark the earlier one as quoted or hypothetical, never to flip the later one. Before reporting a contradiction, state in \"why\" what each sentence claims, in the author's terms. No prose outside the JSON.\n\nTEXT:\n" ++ text
 
-# A chat message gets the document checks, with its chat as context: the chat resolves names and referents,
-# and is not itself checked.
-def message_prompt(+conversation: String, +text: String) -> String:
-  document_prompt(text) ++ "\n\nCONTEXT (the chat this text replies to; not checked):\n" ++ conversation
-
 # Claude's answer holds the annotations inside its result text, sometimes fenced.
 def from_brace(cs: List<&2, Char>) -> List<&2, Char>:
   match cs:

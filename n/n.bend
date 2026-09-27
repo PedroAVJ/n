@@ -23,7 +23,7 @@ def model() -> String:
   "typesafe/jev-1.13"
 
 def version() -> Pl.Version:
-  Pl.Version{0n, 4n, 0n}
+  Pl.Version{0n, 5n, 0n}
 
 # ---- the hook ----
 # Jev screens every phrase; Claude runs N4's checker on what Jev flagged and gives each finding its one
@@ -154,6 +154,12 @@ def screen(+item: String) -> IO(Unit):
     +k : String <- E.key(item)
     jev_screen(String.is_empty(k), k, C.text(C.at(v, "conversation")), C.text(C.at(v, "text")))
 
+# N's whole-document checker prompt for {text} on stdin, for a caller that asks Claude itself.
+def prompt() -> IO(Unit):
+  do IO<Unit>:
+    input : String <- E.stdin()
+    IO.print(C.document_prompt(C.text(C.at(Json.parse(input), "text"))))
+
 def read() -> IO(Unit):
   do IO<Unit>:
     input : String <- E.stdin()
@@ -198,10 +204,11 @@ def command(+c: String, +arg: String) -> IO(Unit):
   Bool.pick(IO(Unit), String.eq(c, "editor"), Ed.run(Maybe.default(&2, U32, U32.read(arg), 4610)),
   Bool.pick(IO(Unit), String.eq(c, "screen"), screen(arg),
   Bool.pick(IO(Unit), String.eq(c, "read"), read(),
+  Bool.pick(IO(Unit), String.eq(c, "prompt"), prompt(),
   Bool.pick(IO(Unit), String.eq(c, "dryrun"), dryrun(arg),
     Bool.pick(IO(Unit), String.eq(c, "plugin") && Bool.not(String.is_empty(arg)), plugin(arg),
       Bool.pick(IO(Unit), String.eq(c, "hook") || String.is_empty(c), hook(arg),
-        IO.print("usage: n editor [port] | n screen [keychain item] | n read | n hook [keychain item] | n dryrun [keychain item] | n plugin <dir>")))))))
+        IO.print("usage: n editor [port] | n screen [keychain item] | n prompt | n read | n hook [keychain item] | n dryrun [keychain item] | n plugin <dir>"))))))))
 
 def dispatch(xs: List<&1, String>) -> IO(Unit):
   match xs:

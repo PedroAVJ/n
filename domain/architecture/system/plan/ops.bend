@@ -117,6 +117,8 @@ def show(s: P.Step) -> String:
       "launch   " ++ l
     case P.Install{_, t}:
       "install  " ++ t
+    case P.BuildNext{r, +sha, d}:
+      "build    " ++ r ++ " @ " ++ String.take(sha, 7n) ++ " (Next.js) into " ++ d
     case P.Rebuild{h, _, _}:
       "rebuild  nix-darwin " ++ h
     case P.ServePort{p, t, _}:

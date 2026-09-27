@@ -31,12 +31,12 @@ def path(+home: String, +label: String) -> String:
 
 def plist(+home: String, a: L.Agent) -> String:
   match a:
-    case L.Agent{_, label, program, _, args, env, +log, _}:
+    case L.Agent{_, label, command, args, env, +log, _}:
       "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" ++
       "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n" ++
       MO.print([M.Element{"plist", [M.Attribute{"version", "1.0"}], [M.Element{"dict", [], [
         key("Label"), str(label),
-        key("ProgramArguments"), M.Element{"array", [], str(program) <> strs(args)},
+        key("ProgramArguments"), M.Element{"array", [], str(command) <> strs(args)},
         key("EnvironmentVariables"), M.Element{"dict", [], vars(env)},
         key("RunAtLoad"), M.Raw{"<true/>"},
         key("KeepAlive"), M.Raw{"<true/>"},
@@ -45,22 +45,27 @@ def plist(+home: String, a: L.Agent) -> String:
 
 def label_of(a: L.Agent) -> String:
   match a:
-    case L.Agent{_, label, _, _, _, _, _, _}:
+    case L.Agent{_, label, _, _, _, _, _}:
       label
+
+def programs(ld: L.Launchd) -> List<&2, L.Program>:
+  match ld:
+    case L.Launchd{xs, _, _}:
+      xs
 
 def agents(ld: L.Launchd) -> List<&2, L.Agent>:
   match ld:
-    case L.Launchd{xs, _}:
+    case L.Launchd{_, xs, _}:
       xs
 
 def serves(ld: L.Launchd) -> List<&2, ND.Serve>:
   match ld:
-    case L.Launchd{_, xs}:
+    case L.Launchd{_, _, xs}:
       xs
 
 def port_of(a: L.Agent) -> U32:
   match a:
-    case L.Agent{_, _, _, _, _, _, _, p}:
+    case L.Agent{_, _, _, _, _, _, p}:
       p
 
 def ports(xs: List<&2, L.Agent>) -> List<&2, U32>:
@@ -69,8 +74,3 @@ def ports(xs: List<&2, L.Agent>) -> List<&2, U32>:
       []
     case a <> rest:
       port_of(a) <> ports(rest)
-
-def entry_of(a: L.Agent) -> String:
-  match a:
-    case L.Agent{_, _, _, e, _, _, _, _}:
-      e

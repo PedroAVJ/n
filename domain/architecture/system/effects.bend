@@ -295,24 +295,24 @@ def observe(+root: String, +entry: String, r: Rl.Release) -> IO(P.Observed):
 # ---- a deploy: carry out a plan with nothing blocked ----
 # Loading a launch agent: `launchctl bootout` returns before the old job is gone, and loading it again fails
 # until it is, so this tries every quarter second, up to `fuel` times.
-def bootstrap_after(ok: Bool, fuel: Nat, +domain: String, +path: String) -> IO(Bool):
-  match ok:
-    case True{}:
-      IO.pure(Bool, True{})
-    case False{}:
-      match fuel:
-        case 0n:
-          IO.pure(Bool, False{})
-        case 1n+k:
+def bootstrap_after(fuel: Nat, ok: Bool, +domain: String, +path: String) -> IO(Bool):
+  match fuel:
+    case 0n:
+      IO.pure(Bool, ok)
+    case 1n+k:
+      match ok:
+        case True{}:
+          IO.pure(Bool, True{})
+        case False{}:
           do IO<Bool>:
             IO.sleep(250)
             again : Bool <- X.succeeds("/bin/launchctl", ["bootstrap", domain, path])
-            bootstrap_after(again, k, domain, path)
+            bootstrap_after(k, again, domain, path)
 
 def bootstrap(fuel: Nat, +domain: String, +path: String) -> IO(Bool):
   do IO<Bool>:
     first : Bool <- X.succeeds("/bin/launchctl", ["bootstrap", domain, path])
-    bootstrap_after(first, fuel, domain, path)
+    bootstrap_after(fuel, first, domain, path)
 
 def apply(+root: String, +bend: String, s: P.Step) -> IO(Unit):
   match s:

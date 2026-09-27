@@ -48,7 +48,8 @@ def editor() -> Ct.Container:
     C.Client{}, Ct.Ours{}, Ct.Tailnet{}, [C.Hosting{}], "editor", [], ["Next.js", "Tailwind CSS"], ["React", "markdown-it", "Claude Agent SDK"], ["TypeScript", "JavaScript"], [], [],
     [uses("library", "Checks documents with N's binary", "n screen, n prompt, n read"),
      uses("openrouter", "Screens documents with Jev through", "HTTPS"),
-     uses("claude", "Checks documents with", "Agent SDK")]}
+     uses("claude", "Checks documents with", "Agent SDK"),
+     uses("elevenlabs", "Transcribes dictation with Scribe through", "the elevenlabs CLI")]}
 
 def browser() -> Ct.Container:
   Ct.Container{"browser", "Safari", "The iPhone's browser.", C.Client{}, Ct.Theirs{}, Ct.Device{}, [], "", ["Apple"], [], [], [], [], [],
@@ -71,7 +72,8 @@ def mac_mini() -> D.Node:
       [Ld.Program{n_bin(), Ld.Bend{"n/n.bend"}}, Ld.Program{editor_dir(), Ld.Next{"editor"}}],
       [Ld.Agent{"editor", "com.pedro.n-editor", "/run/current-system/sw/bin/node", [editor_dir() ++ "/server.js"],
         [Ld.Variable{"PORT", "4610"}, Ld.Variable{"HOSTNAME", "127.0.0.1"}, Ld.Variable{"N_BIN", n_bin()},
-         Ld.Variable{"PATH", "/run/current-system/sw/bin:/usr/bin:/bin:/usr/sbin:/sbin"},
+         Ld.Variable{"ELEVENLABS_BIN", home() ++ "/.local/bin/elevenlabs"},
+         Ld.Variable{"PATH", "/Library/Frameworks/Python.framework/Versions/3.14/bin:/run/current-system/sw/bin:/usr/bin:/bin:/usr/sbin:/sbin"},
          Ld.Variable{"N_KEYCHAIN", "com.pedro.codexvoice.openrouter.v1"}], "n-editor", 4610}],
       [ND.Serve{"editor", 9447, 4610, ""}]}}, [], ["editor"]}
 
@@ -97,6 +99,7 @@ def environment() -> En.Environment:
       external("github", "GitHub", "Hosts V's source.", C.DataApi{}, []),
       external("d2", "D2", "Draws diagrams from text.", C.Cli{}, []),
       external("openrouter", "OpenRouter", "Serves Jev, the model that reads each phrase.", C.ModelApi{}, []),
+      external("elevenlabs", "ElevenLabs", "Transcribes speech with Scribe.", C.ModelApi{}, []),
       external("claude", "Claude Code", "Runs N before it reads a prompt.", C.Cli{}, []) ],
     [K.OpenSource{}],
     I.Inventory{I.Vendor{"Apple", "iCloud"}, [I.Device{"mac-mini", "Mac mini", "macOS"}, I.Device{"iphone", "iPhone", "iOS"}]},

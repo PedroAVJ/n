@@ -14,6 +14,7 @@ export function Editor({ name, initial }: { name: string; initial: string }) {
   const [text, setText] = useState(initial); const [saved, setSaved] = useState(initial);
   const [review, setReview] = useState<Review | null>(null); const [checked, setChecked] = useState(''); const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false); const area = useRef<HTMLTextAreaElement>(null);
+  const [listening, setListening] = useState(false); const recorder = useRef<MediaRecorder | null>(null);
   const title = titleOf(text, name);
   const html = useMemo(() => md.render(text), [text]);
   useEffect(() => { document.title = `${title} · N`; }, [title]);
@@ -34,6 +35,28 @@ export function Editor({ name, initial }: { name: string; initial: string }) {
   };
   const apply = (m: Mark, choice: string) => { const next = text.slice(0, m.start) + choice + text.slice(m.end); setText(next); setReview(null); setChecked(''); area.current?.focus(); };
   const edit = (v: string) => { setText(v); if (review && review.assessor !== 'Jev') setReview(null); };
+  // Dictation: record until pressed again, then ElevenLabs Scribe's text replaces the selection (or goes in at the cursor).
+  const dictate = async () => {
+    if (recorder.current) { recorder.current.stop(); return; }
+    let stream: MediaStream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { setStatus('No microphone access'); return; }
+    const chunks: Blob[] = []; const rec = new MediaRecorder(stream); recorder.current = rec;
+    const at = { start: area.current?.selectionStart ?? text.length, end: area.current?.selectionEnd ?? text.length };
+    rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+    rec.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop()); recorder.current = null; setListening(false); setStatus('Transcribing…');
+      try {
+        const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
+        const r = await fetch('/api/dictate', { method: 'POST', headers: { 'content-type': blob.type }, body: blob });
+        const out = await r.json() as { text?: string; error?: string };
+        if (!r.ok || out.text === undefined) throw Error(out.error || 'Dictation failed');
+        const said = out.text;
+        setText(current => { const before = current.slice(0, at.start), after = current.slice(at.end); const space = before && !/\s$/.test(before) && said ? ' ' : ''; return before + space + said + after; });
+        setStatus('Dictated');
+      } catch (e) { setStatus((e as Error).message); }
+    };
+    rec.start(); setListening(true); setStatus('Listening… press Dictate again to stop');
+  };
   const marks = review?.marks || [];
   return <main className="mx-auto flex max-w-7xl flex-col gap-4 p-4 sm:p-7">
     <div className="flex items-center gap-4 text-sm text-stone-500 dark:text-zinc-400">
@@ -52,6 +75,7 @@ export function Editor({ name, initial }: { name: string; initial: string }) {
     <div className="flex gap-2">
       <Button onClick={save} className="rounded-md border border-stone-300 px-4 py-2 hover:border-orange-700 dark:border-zinc-700">Save</Button>
       <Button onClick={check} disabled={busy} className="rounded-md bg-stone-900 px-4 py-2 text-white hover:bg-orange-700 dark:bg-zinc-100 dark:text-zinc-900">N check</Button>
+      <Button onClick={dictate} aria-pressed={listening} className={`rounded-md border px-4 py-2 ${listening ? 'border-orange-700 bg-orange-700 text-white' : 'border-stone-300 hover:border-orange-700 dark:border-zinc-700'}`}>{listening ? 'Stop' : 'Dictate'}</Button>
       <Button onClick={() => navigator.clipboard.writeText(text)} className="rounded-md border border-stone-300 px-4 py-2 hover:border-orange-700 dark:border-zinc-700">Copy</Button>
     </div>
     {marks.length > 0 && <section aria-live="polite" className="flex flex-col gap-3">

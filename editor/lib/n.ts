@@ -78,10 +78,15 @@ export async function screen(text: string): Promise<Review> {
   return { marks: inUnits(text, r.marks), assessor: r.assessor, seconds: (Date.now() - started) / 1000 };
 }
 
+// A check that has not answered in two minutes has failed; the session is replaced for the next one.
+function within<T>(ms: number, p: Promise<T>): Promise<T> {
+  return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => { checker?.close(); checker = null; reject(Error('N check took over two minutes')); }, ms))]);
+}
+
 export async function check(text: string): Promise<Review> {
   const started = Date.now();
   const prompt = await runN(['prompt'], { text });
-  const answer = await claude(prompt);
+  const answer = await within(120000, claude(prompt));
   const r = JSON.parse(await runN(['read'], { text, answer })) as { marks: Mark[] };
   return { marks: inUnits(text, r.marks), assessor: 'Claude Opus 5.5', seconds: (Date.now() - started) / 1000 };
 }

@@ -71,6 +71,7 @@ def mac_mini() -> D.Node:
       [Ld.Program{n_bin(), Ld.Bend{"n/n.bend"}}, Ld.Program{editor_dir(), Ld.Next{"editor"}}],
       [Ld.Agent{"editor", "com.pedro.n-editor", "/run/current-system/sw/bin/node", [editor_dir() ++ "/server.js"],
         [Ld.Variable{"PORT", "4610"}, Ld.Variable{"HOSTNAME", "127.0.0.1"}, Ld.Variable{"N_BIN", n_bin()},
+         Ld.Variable{"PATH", "/run/current-system/sw/bin:/usr/bin:/bin:/usr/sbin:/sbin"},
          Ld.Variable{"N_KEYCHAIN", "com.pedro.codexvoice.openrouter.v1"}], "n-editor", 4610}],
       [ND.Serve{"editor", 9447, 4610, ""}]}}, [], ["editor"]}
 

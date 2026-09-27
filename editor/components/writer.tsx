@@ -78,9 +78,9 @@ export function Writer({ name, initial, commit, onText }: Props) {
   };
   useEffect(() => { const key = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); void save(); } }; window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key); });
 
+  // Dictation adds what was said to the end of the text.
   const { listening, toggle } = useDictation(said => {
-    const at = { start: area.current?.selectionStart ?? latest.current.length, end: area.current?.selectionEnd ?? latest.current.length };
-    setText(current => { const before = current.slice(0, at.start), after = current.slice(at.end); const space = before && !/\s$/.test(before) && said ? ' ' : ''; return before + space + said + after; });
+    setText(current => current + (current && !/\s$/.test(current) && said ? ' ' : '') + said);
   }, setStatus);
 
   const found: Placed[] = check && check.status !== 'running' ? [...check.errors.map(f => ({ ...f, error: true })), ...check.warnings.map(f => ({ ...f, error: false }))] : [];

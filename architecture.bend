@@ -41,11 +41,11 @@ def library() -> Ct.Container:
       Co.Component{"n", "N", "A type checker for prompts: flags each phrase with more than one reading before an agent acts on it.", Co.Bend{},
         [uses("openrouter", "Asks Jev which phrases are unclear through", "HTTPS"), uses("claude", "Checks each prompt as a hook of", "UserPromptSubmit")]} ], []}
 
-# N's editor: where .n documents are written until each says exactly one thing. A Next.js app from
-# PedroAVJ/n-editor, checking through N's binary; served from Pedro's Mac mini.
+# N's editor: where .n documents are written until each says exactly one thing. A Next.js app in editor/,
+# checking through N's binary; served from Pedro's Mac mini.
 def editor() -> Ct.Container:
   Ct.Container{"editor", "N editor", "Where .n documents are written until each says exactly one thing: Jev screens them, Claude gives the readings.",
-    C.Client{}, Ct.Ours{}, Ct.Tailnet{}, [C.Hosting{}], "", [], ["Next.js", "Tailwind CSS"], ["React", "markdown-it", "Claude Agent SDK"], ["TypeScript"], [], [],
+    C.Client{}, Ct.Ours{}, Ct.Tailnet{}, [C.Hosting{}], "editor", [], ["Next.js", "Tailwind CSS"], ["React", "markdown-it", "Claude Agent SDK"], ["TypeScript", "JavaScript"], [], [],
     [uses("library", "Checks documents with N's binary", "n screen, n prompt, n read"),
      uses("openrouter", "Screens documents with Jev through", "HTTPS"),
      uses("claude", "Checks documents with", "Agent SDK")]}
@@ -58,7 +58,7 @@ def home() -> String:
   "/Users/pedroantoniovillanuevajuarez"
 
 # The Mac mini runs the editor as a launch agent beside what configures the rest of it, served privately on
-# the tailnet at :9447: N's binary built from this repository, the editor built from its own.
+# the tailnet at :9447: N's binary and the editor, both built from this repository.
 def n_bin() -> String:
   home() ++ "/Library/Application Support/N/bin/n"
 
@@ -68,7 +68,7 @@ def editor_dir() -> String:
 def mac_mini() -> D.Node:
   D.Node{"mac-mini", "Mac mini", "macOS", D.Server{}, H.Owned{"mac-mini"},
     D.Launchd{Ld.Launchd{
-      [Ld.Program{n_bin(), Ld.Bend{"n/n.bend"}}, Ld.Program{editor_dir(), Ld.Next{"PedroAVJ/n-editor"}}],
+      [Ld.Program{n_bin(), Ld.Bend{"n/n.bend"}}, Ld.Program{editor_dir(), Ld.Next{"editor"}}],
       [Ld.Agent{"editor", "com.pedro.n-editor", "/run/current-system/sw/bin/node", [editor_dir() ++ "/server.js"],
         [Ld.Variable{"PORT", "4610"}, Ld.Variable{"HOSTNAME", "127.0.0.1"}, Ld.Variable{"N_BIN", n_bin()},
          Ld.Variable{"N_KEYCHAIN", "com.pedro.codexvoice.openrouter.v1"}], "n-editor", 4610}],

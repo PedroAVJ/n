@@ -1,0 +1,31 @@
+{
+  "name": "n-editor",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -H 127.0.0.1 -p 4613",
+    "build": "next build",
+    "start": "next start -H 127.0.0.1 -p 4610",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.283",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@tailwindcss/postcss": "^4.2.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "markdown-it": "^15.0.2",
+    "next": "^16.2.6",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4.2.1"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^26.6.2",
+    "@types/react": "19.0.7",
+    "@types/react-dom": "19.0.3",
+    "typescript": "5.9.3"
+  }
+}

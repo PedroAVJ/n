@@ -11,16 +11,14 @@ def visibility(p: Bool) -> String:
     case False{}:
       "private"
 
-# ---- the repository: Bend only and no dead code come first, then GitHub ----
+# ---- the repository: no dead Bend and hub paths the hub takes come first, then GitHub. What else the
+# repository holds is its containers' business, checked against their declared stacks ----
 def repo_steps(+fs: List<&2, String>, +reached: List<&2, String>) -> List<&2, P.Step>:
   List.append(&2, P.Step,
-    Bool.pick(List<&2, P.Step>, String.is_empty(RlO.not_bend(fs)), [],
-      [P.Blocked{"repository", RlO.not_bend(fs) ++ " is not Bend"}]),
-    List.append(&2, P.Step,
-      Bool.pick(List<&2, P.Step>, String.is_empty(RlO.dead(fs, reached)), [],
-        [P.Blocked{"repository", RlO.dead(fs, reached) ++ " is dead code: no entry reaches it"}]),
-      Bool.pick(List<&2, P.Step>, String.is_empty(RlO.hub_refused(reached)), [],
-        [P.Blocked{"repository", RlO.hub_refused(reached) ++ ": the Bend hub refuses this path (segments of letters, digits and _)"}])))
+    Bool.pick(List<&2, P.Step>, String.is_empty(RlO.dead(fs, reached)), [],
+      [P.Blocked{"repository", RlO.dead(fs, reached) ++ " is dead code: no entry reaches it"}]),
+    Bool.pick(List<&2, P.Step>, String.is_empty(RlO.hub_refused(reached)), [],
+      [P.Blocked{"repository", RlO.hub_refused(reached) ++ ": the Bend hub refuses this path (segments of letters, digits and _)"}]))
 
 def remote_step(+repo: Rl.Repository, rm: P.Remote) -> P.Step:
   match repo rm:
@@ -117,8 +115,8 @@ def show(s: P.Step) -> String:
       "launch   " ++ l
     case P.Install{_, t}:
       "install  " ++ t
-    case P.BuildNext{r, +sha, d}:
-      "build    " ++ r ++ " @ " ++ String.take(sha, 7n) ++ " (Next.js) into " ++ d
+    case P.BuildNext{f, +tree, d}:
+      "build    " ++ f ++ " @ " ++ String.take(tree, 7n) ++ " (Next.js) into " ++ d
     case P.Rebuild{h, _, _}:
       "rebuild  nix-darwin " ++ h
     case P.ServePort{p, t, _}:

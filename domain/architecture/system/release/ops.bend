@@ -106,17 +106,6 @@ def is_source(+f: String) -> Bool:
 def base_name(f: String) -> String:
   Maybe.default(&2, String, List.head(&2, String, List.reverse(&2, String, String.split(f, '/'))), "")
 
-# A file that is neither Bend source nor an effect: only licenses, the readme and the ignore list may be.
-def allowed(+f: String) -> Bool:
-  is_source(f) || String.eq(base_name(f), "LICENSE") || String.eq(f, "README.md") || String.eq(f, ".gitignore")
-
-def bend_only(fs: List<&2, String>) -> Bool:
-  match fs:
-    case []:
-      True{}
-    case +f <> rest:
-      allowed(f) && bend_only(rest)
-
 # Every source file is reachable from an entry: a package's, or the system's own.
 def no_dead_code(fs: List<&2, String>, +reached: List<&2, String>) -> Bool:
   match fs:
@@ -134,13 +123,6 @@ def dead(fs: List<&2, String>, +reached: List<&2, String>) -> String:
       Bool.pick(String, is_source(f) && Bool.not(List.contains(~String, ~String.eq, reached, f)), f, dead(rest, reached))
 
 # The first file that is not Bend, "" when there is none.
-def not_bend(fs: List<&2, String>) -> String:
-  match fs:
-    case []:
-      ""
-    case +f <> rest:
-      Bool.pick(String, allowed(f), not_bend(rest), f)
-
 # ---- the hub's path rule: every segment is [A-Za-z_][A-Za-z0-9_]* (the file name also ends in .bend, .c or
 # .js, or is a LICENSE), under 256 characters ----
 def name_char(+c: Char, first: Bool) -> Bool:

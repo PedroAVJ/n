@@ -20,6 +20,30 @@ def source_of(c: Ct.Container) -> String:
     case Ct.Container{_, _, _, _, _, _, _, s, _, _, _, _, _, _, _}:
       s
 
+# Every built container's source folder.
+def sources(cs: List<&2, Ct.Container>) -> List<&2, String>:
+  match cs:
+    case []:
+      []
+    case c <> rest:
+      source_of(c) <> sources(rest)
+
+# The other source folders: every one but this container's own, and not the repository's root.
+def other_sources(+mine: String, ss: List<&2, String>) -> List<&2, String>:
+  match ss:
+    case []:
+      []
+    case +s <> rest:
+      +more = other_sources(mine, rest)
+      Bool.pick(List<&2, String>, String.eq(s, mine) || String.eq(s, ".") || String.is_empty(s), more, s <> more)
+
+def under_any(+f: String, ds: List<&2, String>) -> Bool:
+  match ds:
+    case []:
+      False{}
+    case d <> rest:
+      String.starts_with(f, d ++ "/") || under_any(f, rest)
+
 def keep_built(+c: Ct.Container, +rest: List<&2, Ct.Container>) -> List<&2, Ct.Container>:
   Bool.pick(List<&2, Ct.Container>, String.is_empty(source_of(c)), rest, c <> rest)
 
@@ -40,7 +64,8 @@ def package_name(+name: String) -> String:
   Bool.pick(String, String.eq(name, "Convex"), "convex",
   Bool.pick(String, String.eq(name, "OpenRouter SDK"), "@openrouter/sdk",
   Bool.pick(String, String.eq(name, "Sentry SDK"), "@sentry/nextjs",
-  Bool.pick(String, String.eq(name, "whatsmeow"), "go.mau.fi/whatsmeow", name)))))))
+  Bool.pick(String, String.eq(name, "Claude Agent SDK"), "@anthropic-ai/claude-agent-sdk",
+  Bool.pick(String, String.eq(name, "whatsmeow"), "go.mau.fi/whatsmeow", name))))))))
 
 # Whether a language is written in files with this extension.
 def language_extension(+name: String, +ext: String) -> Bool:

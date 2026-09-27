@@ -5,11 +5,11 @@ import ../nix_darwin/type.bend as ND
 # configures the machine (nix-darwin, another system's deploy): nothing it does not declare is touched.
 
 # How a program comes to be at its path: installed by something else; built from a Bend file in the
-# repository; or a Next.js app built from a GitHub repository's main branch (standalone), its folder at the path.
+# repository; or a Next.js app built from a folder of the repository (standalone), its build at the path.
 type Build is Data:
   Installed{}
   Bend{entry: String}
-  Next{repository: String}
+  Next{folder: String}
 
 type Program is Data:
   Program{path: String, build: Build}

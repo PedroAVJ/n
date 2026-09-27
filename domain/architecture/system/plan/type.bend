@@ -35,6 +35,6 @@ type Step is Data:
   ServePort{https: U32, target: String, tailscale: String}
   Launch{label: String, path: String, plist: String, domain: String}
   Install{from: String, to: String}
-  BuildNext{repository: String, sha: String, dir: String}
+  BuildNext{folder: String, tree: String, dir: String}
   Change{what: String, now: String, want: String}
   Blocked{what: String, why: String}

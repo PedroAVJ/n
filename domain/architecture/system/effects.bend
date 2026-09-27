@@ -330,20 +330,20 @@ def apply(+root: String, +bend: String, s: P.Step) -> IO(Unit):
       do IO<Unit>:
         ok : Bool <- release_plugin(root, n, v, r, create)
         IO.print(Bool.pick(String, ok, "released plugin " ++ n ++ "@" ++ v, "failed   release plugin " ++ n ++ "@" ++ v))
-    case P.BuildNext{+r, _, +dir}:
+    case P.BuildNext{+f, +tree, +dir}:
       do IO<Unit>:
         +src : String = root ++ "/.git/v-launchd/next-src"
         _ : Bool <- X.succeeds("/bin/rm", ["-rf", src])
-        cloned : Bool <- X.succeeds("gh", ["repo", "clone", r, src, "--", "--depth", "1", "-q"])
+        _ : Bool <- X.succeeds("/bin/mkdir", ["-p", src])
+        cloned : Bool <- X.succeeds("/usr/bin/rsync", ["-a", "--exclude", "node_modules", "--exclude", ".next", root ++ "/" ++ f ++ "/", src ++ "/"])
         deps : Bool <- X.succeeds("/run/current-system/sw/bin/npm", ["--prefix", src, "ci", "--no-audit", "--no-fund"])
         built : Bool <- X.succeeds("/run/current-system/sw/bin/npm", ["--prefix", src, "run", "build"])
         _ : Bool <- X.succeeds("/bin/mkdir", ["-p", dir ++ "/.next"])
         copied : Bool <- X.succeeds("/usr/bin/rsync", ["-a", "--delete", "--exclude", ".next/static", src ++ "/.next/standalone/", dir ++ "/"])
         _ : Bool <- X.succeeds("/usr/bin/rsync", ["-a", "--delete", src ++ "/.next/static/", dir ++ "/.next/static/"])
-        head : String <- X.run("git", ["-C", src, "rev-parse", "HEAD"])
         +ok : Bool = cloned && deps && built && copied
-        Bool.pick(IO(Unit), ok, X.write(dir ++ "/.v-commit", String.trim(head)), IO.pure(Unit, Unit{}))
-        IO.print(Bool.pick(String, ok, "built    " ++ r ++ " into " ++ dir, "failed   build " ++ r))
+        Bool.pick(IO(Unit), ok, X.write(dir ++ "/.v-commit", tree), IO.pure(Unit, Unit{}))
+        IO.print(Bool.pick(String, ok, "built    " ++ f ++ " into " ++ dir, "failed   build " ++ f))
     case P.Install{+from, +to}:
       do IO<Unit>:
         _ : Bool <- X.succeeds("/bin/mkdir", ["-p", Fs.path.parent(to)])

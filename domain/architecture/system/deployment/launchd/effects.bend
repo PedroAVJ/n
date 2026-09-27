@@ -22,10 +22,11 @@ def bend_step(built: Bool, same: Bool, +entry: String, +from: String, +path: Str
   Bool.pick(P.Step, Bool.not(built), P.Blocked{what, entry ++ " does not build"},
     Bool.pick(P.Step, same, P.Current{"program " ++ path}, P.Install{from, path}))
 
-def next_step(+sha: String, +installed: String, +repository: String, +path: String, +what: String) -> P.Step:
-  Bool.pick(P.Step, String.is_empty(sha), P.Blocked{what, "cannot read " ++ repository ++ "'s main branch"},
-    Bool.pick(P.Step, String.eq(sha, installed), P.Current{"program " ++ path ++ " (" ++ repository ++ " @ " ++ String.take(sha, 7n) ++ ")"},
-      P.BuildNext{repository, sha, path}))
+# A Next.js build is current while it was built from the folder's committed tree.
+def next_step(+tree: String, +installed: String, +folder: String, +path: String, +what: String) -> P.Step:
+  Bool.pick(P.Step, String.is_empty(tree), P.Blocked{what, folder ++ " is not in the repository's commit"},
+    Bool.pick(P.Step, String.eq(tree, installed), P.Current{"program " ++ path ++ " (" ++ folder ++ " @ " ++ String.take(tree, 7n) ++ ")"},
+      P.BuildNext{folder, tree, path}))
 
 def program_step(+root: String, +home: String, +what: String, g: L.Program) -> IO(P.Step):
   match g:
@@ -42,11 +43,11 @@ def program_step(+root: String, +home: String, +what: String, g: L.Program) -> I
             built : Bool <- X.succeeds(home ++ "/.bend/bin/bend", [root ++ "/" ++ entry, "-o", from])
             same : Bool <- X.succeeds("/usr/bin/cmp", ["-s", from, path])
             return bend_step(built, same, entry, from, path, what)
-        case L.Next{+repository}:
+        case L.Next{+folder}:
           do IO<P.Step>:
-            sha : String <- X.run("gh", ["api", "repos/" ++ repository ++ "/commits/main", "--jq", ".sha"])
+            tree : String <- X.run("git", ["-C", root, "rev-parse", "HEAD:" ++ folder])
             installed : String <- X.read(path ++ "/.v-commit")
-            return next_step(String.trim(sha), String.trim(installed), repository, path, what)
+            return next_step(String.trim(tree), String.trim(installed), folder, path, what)
 
 def program_steps(gs: List<&2, L.Program>, +root: String, +home: String, +what: String) -> IO(List<&2, P.Step>):
   match gs:

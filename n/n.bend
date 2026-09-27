@@ -2,6 +2,7 @@ import Base
 import bend-net-json@0.3.0.0/json.bend as Json
 import ./check.bend as C
 import ./effects.bend as E
+import ./editor.bend as Ed
 import ./type.bend as T
 import ../domain/architecture/system/release/plugin/type.bend as Pl
 import ../domain/architecture/system/release/plugin/ops.bend as PlO
@@ -131,6 +132,7 @@ def dryrun(+item: String) -> IO(Unit):
     IO.print("Nothing was sent.")
 
 # ---- Near's composer: Jev's screen, then the deep check on the person's own Claude ----
+#   n editor [port]   N's editor, served by Bend (see editor.bend)
 #   n screen [item]   {text, conversation} on stdin: Jev's marks, and the checker prompt for Claude
 #   n read            {text, answer} on stdin: the marks in Claude's answer
 def jev_screen(no_key: Bool, +k: String, +conversation: String, +text: String) -> IO(Unit):
@@ -193,12 +195,13 @@ def plugin(+dir: String) -> IO(Unit):
 
 # ---- the command line ----
 def command(+c: String, +arg: String) -> IO(Unit):
+  Bool.pick(IO(Unit), String.eq(c, "editor"), Ed.run(Maybe.default(&2, U32, U32.read(arg), 4610)),
   Bool.pick(IO(Unit), String.eq(c, "screen"), screen(arg),
   Bool.pick(IO(Unit), String.eq(c, "read"), read(),
   Bool.pick(IO(Unit), String.eq(c, "dryrun"), dryrun(arg),
     Bool.pick(IO(Unit), String.eq(c, "plugin") && Bool.not(String.is_empty(arg)), plugin(arg),
       Bool.pick(IO(Unit), String.eq(c, "hook") || String.is_empty(c), hook(arg),
-        IO.print("usage: n screen [keychain item] | n read | n hook [keychain item] | n dryrun [keychain item] | n plugin <dir>"))))))
+        IO.print("usage: n editor [port] | n screen [keychain item] | n read | n hook [keychain item] | n dryrun [keychain item] | n plugin <dir>")))))))
 
 def dispatch(xs: List<&1, String>) -> IO(Unit):
   match xs:

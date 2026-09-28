@@ -1,8 +1,8 @@
 import 'server-only';
-import { mkdir, readFile, rename as renameIn, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename as renameIn, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { read, rename as renameFile, save } from './documents';
+import { read, remove as removeFile, rename as renameFile, save } from './documents';
 import { drop as dropDraft, keys as draftKeys, read as readDraft, save as saveDraft } from './drafts';
 import { check, format, type Mark, type Which } from './n';
 
@@ -79,19 +79,35 @@ async function run(name: string, r: Result) {
   await put(name, 'result', r);
 }
 
+// Whether a check runs on a page or on one under it.
+const checking = (id: string) => [...running].some(r => r === id || r.startsWith(`${id}/`));
+// The drafts of a page and of the pages under it, each as its key and its page's id.
+const draftsUnder = async (id: string) => (await draftKeys()).flatMap(key => {
+  const page = key.startsWith('doc:') ? key.slice(4) : null;
+  return page !== null && (page === id || page.startsWith(`${id}/`)) ? [[key, page] as const] : [];
+});
+
 // A page renamed: its file and the pages under it move, and so do their checks, intents and drafts; the
 // answer is its new id. Not while a check runs on it or under it, which would write back under the old name.
 export async function rename(id: string, name: string) {
-  if ([...running].some(r => r === id || r.startsWith(`${id}/`))) throw Error('N is checking this page: rename it when the check is done');
+  if (checking(id)) throw Error('N is checking this page: rename it when the check is done');
   const to = await renameFile(id, name);
   for (const kind of ['result', 'intents']) await renameIn(at(id, kind), at(to, kind)).catch(() => {});
   await renameIn(join(folder, ...id.split('/')), join(folder, ...to.split('/'))).catch(() => {});
-  for (const key of await draftKeys()) {
-    const page = key.startsWith('doc:') ? key.slice(4) : null;
-    if (page === null || (page !== id && !page.startsWith(`${id}/`))) continue;
+  for (const [key, page] of await draftsUnder(id)) {
     const draft = await readDraft(key);
     if (draft !== null) await saveDraft(`doc:${to}${page.slice(id.length)}`, draft);
     await dropDraft(key);
   }
   return to;
+}
+
+// A page deleted: it and the pages under it go to the trash (see documents.remove), and their checks,
+// intents and drafts go. Not while a check runs on it or under it, which would write its result back.
+export async function remove(id: string) {
+  if (checking(id)) throw Error('N is checking this page: delete it when the check is done');
+  await removeFile(id);
+  for (const kind of ['result', 'intents']) await rm(at(id, kind), { force: true });
+  await rm(join(folder, ...id.split('/')), { recursive: true, force: true });
+  for (const [key] of await draftsUnder(id)) await dropDraft(key);
 }

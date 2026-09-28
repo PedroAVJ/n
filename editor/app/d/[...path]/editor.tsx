@@ -7,13 +7,15 @@ import { Pages } from '@/components/page-list';
 import { Writer } from '@/components/writer';
 import { ancestors, href, nameOf, segments } from '@/lib/pages';
 import { NewDocument } from '../../new-document';
+import { DeletePage } from './delete-page';
 
 const titleOf = (text: string, fallback: string) => text.match(/^#\s+(.+)$/m)?.[1].trim() || fallback;
 type Sub = { id: string; name: string; title: string; pages: number };
 
-// One page: the pages above it, its title and name (renamed here), its text, written and checked by N (see
-// Writer), and after it the pages under it, in the author's order, and a new one.
-export function Editor({ id, initial, pages }: { id: string; initial: string; pages: Sub[] }) {
+// One page: the pages above it and its bin, its title and name (renamed here), its text, written and checked
+// by N (see Writer), and after it the pages under it, in the author's order, and a new one. under is how many
+// pages are under it, at any depth.
+export function Editor({ id, initial, pages, under }: { id: string; initial: string; pages: Sub[]; under: number }) {
   const router = useRouter(); const name = nameOf(id);
   const [text, setText] = useState(initial);
   const [renaming, setRenaming] = useState(false); const [to, setTo] = useState(name); const [problem, setProblem] = useState('');
@@ -29,10 +31,13 @@ export function Editor({ id, initial, pages }: { id: string; initial: string; pa
     router.replace((await r.json() as { path: string }).path);
   };
   return <main className="mx-auto flex max-w-[680px] flex-col px-4 pb-44 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6">
-    <nav aria-label="Pages above" className="flex h-10 items-center gap-0.5 overflow-x-auto text-sm text-muted">
-      <Link href="/" className="shrink-0 rounded-md px-1.5 py-1 font-serif font-semibold text-ink hover:bg-hover">N</Link>
-      {ancestors(id).map(([aid, aname]) => <span key={aid} className="flex shrink-0 items-center gap-0.5"><ChevronIcon className="size-3.5 text-faint" /><Link href={href(aid)} className="rounded-md px-1.5 py-1 hover:bg-hover hover:text-ink">{aname}</Link></span>)}
-    </nav>
+    <div className="flex h-10 items-center gap-2">
+      <nav aria-label="Pages above" className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto text-sm text-muted">
+        <Link href="/" className="shrink-0 rounded-md px-1.5 py-1 font-serif font-semibold text-ink hover:bg-hover">N</Link>
+        {ancestors(id).map(([aid, aname]) => <span key={aid} className="flex shrink-0 items-center gap-0.5"><ChevronIcon className="size-3.5 text-faint" /><Link href={href(aid)} className="rounded-md px-1.5 py-1 hover:bg-hover hover:text-ink">{aname}</Link></span>)}
+      </nav>
+      <DeletePage id={id} title={title} under={under} />
+    </div>
     <header className="mt-8 flex flex-col gap-1.5">
       <h1 className="font-serif text-[34px] font-semibold leading-[1.15] tracking-[-0.01em] sm:text-[40px]">{title}</h1>
       {renaming ? <div className="flex flex-wrap items-center gap-2">

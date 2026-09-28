@@ -6,7 +6,7 @@ import { nameOf, parentOf } from './pages';
 
 // .n pages. A page is a file named by letters, digits, spaces, &, - and _ (no space first or last); its
 // subpages are the pages in the folder of the same name beside it, as deep as wanted. A page's id is its
-// path (see pages.ts). Its title is its first # heading, or its name.
+// path (see pages.ts). Its title is its first # heading, or its name. A deleted page goes to N/trash.
 export const folder = process.env.N_DOCUMENTS || join(homedir(), 'Library/Application Support/N/documents');
 export const nameOk = (name: string) => /^[A-Za-z0-9_&-](?:[A-Za-z0-9 _&-]{0,62}[A-Za-z0-9_&-])?$/.test(name);
 export const nameRule = "A page's name is letters, digits, spaces, &, - and _";
@@ -71,4 +71,16 @@ export async function rename(id: string, name: string) {
   await move(under(id), under(to)).catch(() => {});
   const set = await order(parentOf(id)); if (set.includes(nameOf(id))) await setOrder(parentOf(id), set.map(n => n === nameOf(id) ? name : n));
   return to;
+}
+
+// Deleting moves the page and the pages under it to N/trash, into a folder named for when, where they were
+// under it, and takes it out of its parent's order.
+const trash = join(dirname(folder), 'trash');
+export async function remove(id: string) {
+  if ((await read(id)) === null) throw Error('No such page');
+  const to = join(trash, new Date().toISOString().replace(/[:.]/g, '-'), ...id.split('/'));
+  await mkdir(dirname(to), { recursive: true });
+  await move(file(id), `${to}.n`);
+  await move(under(id), to).catch(() => {});
+  const set = await order(parentOf(id)); if (set.includes(nameOf(id))) await setOrder(parentOf(id), set.filter(n => n !== nameOf(id)));
 }

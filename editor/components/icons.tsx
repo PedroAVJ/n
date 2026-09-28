@@ -12,6 +12,7 @@ export const TickIcon = svg(<path d="M4.5 10.5l3.5 3.5 7.5-8" />);
 export const UpIcon = svg(<path d="M5.5 12l4.5-4.5 4.5 4.5" />);
 export const DownIcon = svg(<path d="M5.5 8l4.5 4.5L14.5 8" />);
 export const ChevronIcon = svg(<path d="M8 5.5l4.5 4.5L8 14.5" />);
+export const TrashIcon = svg(<><path d="M3.75 5.5h12.5M8 5.5V3.75h4V5.5" /><path d="M5.25 5.5l.75 10.75h8l.75-10.75" /><path d="M8.5 8.75v4.5M11.5 8.75v4.5" /></>);
 export function Spinner({ className = 'size-4' }: P) {
   return <span aria-hidden className={`${className} inline-block animate-spin rounded-full border-2 border-current border-t-transparent`} />;
 }
